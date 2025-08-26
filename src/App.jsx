@@ -4,10 +4,18 @@ const NEXAAddInventoryApp = () => {
   const [screen, setScreen] = useState('home');
   const [processing, setProcessing] = useState(false);
   const [statusMessage, setStatusMessage] = useState('');
+  
+  // Barcode scanning states
+  const [scannedBarcode, setScannedBarcode] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [searchResults, setSearchResults] = useState([]);
   const [selectedProduct, setSelectedProduct] = useState(null);
+  
+  // Edit product states
+  const [editingProduct, setEditingProduct] = useState(null);
   const [newItemId, setNewItemId] = useState('');
+  const [originalItemId, setOriginalItemId] = useState('');
+  
   const [newProduct, setNewProduct] = useState({
     itemId: '',
     brand: '',
@@ -68,30 +76,42 @@ const NEXAAddInventoryApp = () => {
     }
   };
 
-  // Search products by name or brand
-  const handleSearch = (term) => {
-    setSearchTerm(term);
-    if (term.length < 2) {
-      setSearchResults([]);
-      return;
-    }
-
-    const results = inventory.filter(product => 
-      product.name.toLowerCase().includes(term.toLowerCase()) ||
-      product.brand.toLowerCase().includes(term.toLowerCase()) ||
-      product.itemId.toLowerCase().includes(term.toLowerCase())
-    );
+  // Simulate barcode scanning (for testing)
+  const simulateBarcodeScan = () => {
+    const barcode = prompt('Enter barcode to scan (or leave empty to test "not found"):');
+    if (barcode === null) return; // User cancelled
     
-    setSearchResults(results.slice(0, 20)); // Limit to 20 results
+    if (barcode === '') {
+      // Test "not found" scenario
+      handleBarcodeScanned('TEST_NOT_FOUND_123');
+    } else {
+      handleBarcodeScanned(barcode);
+    }
   };
 
-  // Update ItemId for existing product
-  const updateProductItemId = async (product, newId) => {
+  // Handle barcode scanning result
+  const handleBarcodeScanned = (barcode) => {
+    setScannedBarcode(barcode);
+    
+    // Look for product by barcode/itemId
+    const foundProduct = inventory.find(item => item.itemId === barcode);
+    
+    if (foundProduct) {
+      // SCENARIO A: Barcode found - Add to inventory
+      addStockToProduct(foundProduct, 1);
+    } else {
+      // SCENARIO B: Barcode not found - Show search
+      setScreen('barcodeNotFound');
+    }
+  };
+
+  // Add stock to existing product
+  const addStockToProduct = async (product, quantity) => {
     setProcessing(true);
-    setStatusMessage(`Updating barcode for ${product.name}...`);
+    setStatusMessage(`Adding ${quantity} to ${product.name}...`);
     
     try {
-      const url = `${GOOGLE_SHEETS_CONFIG.SCRIPT_URL}?action=updateItemId&oldItemId=${encodeURIComponent(product.itemId)}&newItemId=${encodeURIComponent(newId)}&productName=${encodeURIComponent(product.name)}&brand=${encodeURIComponent(product.brand)}`;
+      const url = `${GOOGLE_SHEETS_CONFIG.SCRIPT_URL}?action=updateStock&itemId=${encodeURIComponent(product.itemId)}&quantity=${quantity}`;
       
       const response = await fetch(url);
       
@@ -102,11 +122,7 @@ const NEXAAddInventoryApp = () => {
       const responseText = await response.text();
 
       if (responseText.includes('SUCCESS')) {
-        setStatusMessage(`✅ Updated barcode for ${product.name}`);
-        setSelectedProduct(null);
-        setNewItemId('');
-        setSearchTerm('');
-        setSearchResults([]);
+        setStatusMessage(`✅ Added ${quantity} to ${product.name}`);
         
         // Refresh inventory
         setTimeout(() => {
@@ -128,7 +144,90 @@ const NEXAAddInventoryApp = () => {
     }
   };
 
-  // Add new product to Google Sheets
+  // Search products by name or brand
+  const handleProductSearch = (term) => {
+    setSearchTerm(term);
+    if (term.length < 2) {
+      setSearchResults([]);
+      return;
+    }
+
+    const results = inventory.filter(product => 
+      product.name.toLowerCase().includes(term.toLowerCase()) ||
+      product.brand.toLowerCase().includes(term.toLowerCase())
+    );
+    
+    setSearchResults(results.slice(0, 10)); // Limit to 10 results
+  };
+
+  // Handle product selection for editing
+  const handleProductSelected = (product) => {
+    setEditingProduct({
+      itemId: product.itemId,
+      brand: product.brand,
+      name: product.name,
+      bottleSize: product.bottleSize,
+      price: product.price,
+      quantity: 1, // Default quantity to add
+      minimum: product.minimum,
+      notes: product.notes,
+      vendor: product.vendor,
+      vendorContact: product.vendorContact
+    });
+    setOriginalItemId(product.itemId);
+    setNewItemId(scannedBarcode); // Set to the scanned barcode
+    setScreen('editProduct');
+  };
+
+  // Update product with new ItemId and other changes
+  const updateProductInfo = async (productData) => {
+    setProcessing(true);
+    setStatusMessage('Updating product information...');
+    
+    try {
+      const url = `${GOOGLE_SHEETS_CONFIG.SCRIPT_URL}?action=updateItemId&oldItemId=${encodeURIComponent(originalItemId)}&newItemId=${encodeURIComponent(productData.itemId)}&brand=${encodeURIComponent(productData.brand)}&name=${encodeURIComponent(productData.name)}&bottleSize=${encodeURIComponent(productData.bottleSize)}&price=${encodeURIComponent(productData.price)}&minimum=${encodeURIComponent(productData.minimum)}&notes=${encodeURIComponent(productData.notes)}&vendor=${encodeURIComponent(productData.vendor)}&vendorContact=${encodeURIComponent(productData.vendorContact)}`;
+      
+      const response = await fetch(url);
+      
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      const responseText = await response.text();
+
+      if (responseText.includes('SUCCESS')) {
+        setStatusMessage(`✅ Updated ${productData.name}`);
+        
+        // Also add the quantity to inventory
+        setTimeout(async () => {
+          await addStockToProduct({...productData, itemId: productData.itemId}, productData.quantity);
+          
+          // Reset states and go home
+          setScreen('home');
+          setScannedBarcode('');
+          setSearchTerm('');
+          setSearchResults([]);
+          setEditingProduct(null);
+          setSelectedProduct(null);
+          setNewItemId('');
+          setOriginalItemId('');
+        }, 1000);
+        
+        return true;
+      } else {
+        setStatusMessage(`❌ Error: ${responseText}`);
+        return false;
+      }
+      
+    } catch (error) {
+      setStatusMessage(`❌ Connection error: ${error.message}`);
+      return false;
+    } finally {
+      setProcessing(false);
+    }
+  };
+
+  // Add completely new product
   const addNewProductToInventory = async (productData) => {
     setProcessing(true);
     setStatusMessage('Adding new product to inventory...');
@@ -147,24 +246,23 @@ const NEXAAddInventoryApp = () => {
       if (responseText.includes('SUCCESS')) {
         setStatusMessage(`✅ Successfully added: ${productData.brand} ${productData.name}`);
         
-        // Reset form
-        setNewProduct({
-          itemId: '',
-          brand: '',
-          name: '',
-          bottleSize: '',
-          price: '',
-          quantity: 1,
-          minimum: '',
-          notes: '',
-          vendor: '',
-          vendorContact: ''
-        });
-        
-        // Refresh inventory
+        // Reset form and go home
         setTimeout(() => {
+          setScreen('home');
+          setScannedBarcode('');
+          setNewProduct({
+            itemId: '',
+            brand: '',
+            name: '',
+            bottleSize: '',
+            price: '',
+            quantity: 1,
+            minimum: '',
+            notes: '',
+            vendor: '',
+            vendorContact: ''
+          });
           fetchInventory();
-          setStatusMessage('');
         }, 2000);
         
         return true;
@@ -181,71 +279,40 @@ const NEXAAddInventoryApp = () => {
     }
   };
 
+  // Handle edit product form submission
+  const handleEditProductSubmit = async (e) => {
+    e.preventDefault();
+    
+    if (!editingProduct.itemId.trim() || !editingProduct.name.trim()) {
+      alert('❌ Item ID and Product name are required');
+      return;
+    }
+    
+    await updateProductInfo(editingProduct);
+  };
+
   // Handle new product form submission
   const handleNewProductSubmit = async (e) => {
     e.preventDefault();
     
-    // Validation
-    if (!newProduct.itemId.trim()) {
-      alert('❌ Item ID is required');
+    if (!newProduct.itemId.trim() || !newProduct.name.trim()) {
+      alert('❌ Item ID and Product name are required');
       return;
-    }
-    
-    if (!newProduct.name.trim()) {
-      alert('❌ Product name is required');
-      return;
-    }
-    
-    // Check if product already exists
-    const existingProduct = inventory.find(item => item.itemId === newProduct.itemId.trim());
-    if (existingProduct) {
-      if (!confirm(`Product with ID "${newProduct.itemId}" already exists.\n\nDo you want to continue anyway?`)) {
-        return;
-      }
     }
     
     await addNewProductToInventory(newProduct);
   };
 
-  // Handle ItemId update submission
-  const handleItemIdUpdate = async (e) => {
-    e.preventDefault();
-    
-    if (!newItemId.trim()) {
-      alert('❌ Please enter a new barcode/Item ID');
-      return;
-    }
-
-    if (newItemId.trim() === selectedProduct.itemId) {
-      alert('❌ New barcode is the same as current barcode');
-      return;
-    }
-
-    // Check if new ItemId already exists
-    const existingProduct = inventory.find(item => item.itemId === newItemId.trim());
-    if (existingProduct) {
-      if (!confirm(`Barcode "${newItemId}" is already used by "${existingProduct.name}".\n\nDo you want to continue anyway?`)) {
-        return;
-      }
-    }
-
-    await updateProductItemId(selectedProduct, newItemId.trim());
-  };
-
-  // Clear form
-  const clearForm = () => {
-    setNewProduct({
-      itemId: '',
-      brand: '',
-      name: '',
-      bottleSize: '',
-      price: '',
-      quantity: 1,
-      minimum: '',
-      notes: '',
-      vendor: '',
-      vendorContact: ''
-    });
+  // Cancel and reset to home
+  const cancelAndGoHome = () => {
+    setScreen('home');
+    setScannedBarcode('');
+    setSearchTerm('');
+    setSearchResults([]);
+    setEditingProduct(null);
+    setSelectedProduct(null);
+    setNewItemId('');
+    setOriginalItemId('');
     setStatusMessage('');
   };
 
@@ -365,24 +432,20 @@ const NEXAAddInventoryApp = () => {
 
           <div style={{ display: 'grid', gap: '16px' }}>
             <button 
-              onClick={() => setScreen('newProduct')}
+              onClick={simulateBarcodeScan}
+              style={{...buttonStyle, background: '#3b82f6', fontSize: '20px', padding: '20px'}}
+            >
+              📱 Scan Barcode
+            </button>
+
+            <button 
+              onClick={() => {
+                setNewProduct({...newProduct, itemId: ''});
+                setScreen('newProduct');
+              }}
               style={{...buttonStyle, background: '#8b5cf6'}}
             >
               ➕ Add New Product
-            </button>
-
-            <button 
-              onClick={() => setScreen('searchUpdate')}
-              style={{...buttonStyle, background: '#f59e0b'}}
-            >
-              🔍 Search & Update Barcode
-            </button>
-
-            <button 
-              onClick={() => alert('🚧 Barcode scanning coming soon!')}
-              style={{...buttonStyle, background: '#3b82f6'}}
-            >
-              📱 Scan Barcode
             </button>
 
             <button 
@@ -424,21 +487,14 @@ const NEXAAddInventoryApp = () => {
     );
   }
 
-  // SEARCH & UPDATE SCREEN
-  if (screen === 'searchUpdate') {
+  // BARCODE NOT FOUND SCREEN
+  if (screen === 'barcodeNotFound') {
     return (
       <div style={containerStyle}>
         <div style={cardStyle}>
           <div style={{ display: 'flex', alignItems: 'center', marginBottom: '24px' }}>
             <button 
-              onClick={() => {
-                setScreen('home');
-                setSearchTerm('');
-                setSearchResults([]);
-                setSelectedProduct(null);
-                setNewItemId('');
-                setStatusMessage('');
-              }}
+              onClick={cancelAndGoHome}
               style={{ 
                 background: 'none', 
                 border: 'none', 
@@ -450,7 +506,127 @@ const NEXAAddInventoryApp = () => {
               ⬅️
             </button>
             <h2 style={{ fontSize: '28px', fontWeight: 'bold', color: '#1f2937', margin: 0 }}>
-              Search & Update Barcode
+              Product Not Found
+            </h2>
+          </div>
+
+          <div style={{ background: '#fef3c7', padding: '16px', borderRadius: '8px', marginBottom: '24px' }}>
+            <p style={{ color: '#92400e', marginBottom: '8px' }}>
+              <strong>Scanned Barcode: {scannedBarcode}</strong>
+            </p>
+            <p style={{ color: '#92400e', margin: 0 }}>
+              This barcode was not found in your inventory.
+            </p>
+          </div>
+
+          <div style={{ marginBottom: '24px' }}>
+            <label style={labelStyle}>Search for existing product by name:</label>
+            <input
+              type="text"
+              value={searchTerm}
+              onChange={(e) => handleProductSearch(e.target.value)}
+              placeholder="Start typing product name or brand..."
+              style={inputStyle}
+              autoFocus
+            />
+            <p style={{ fontSize: '14px', color: '#6b7280', marginTop: '8px' }}>
+              Type at least 2 characters to search
+            </p>
+          </div>
+
+          {/* Live Search Results */}
+          {searchResults.length > 0 && (
+            <div style={{ marginBottom: '24px' }}>
+              <h3 style={{ color: '#374151', marginBottom: '12px' }}>
+                Found {searchResults.length} matching product{searchResults.length !== 1 ? 's' : ''}:
+              </h3>
+              <div style={{ maxHeight: '300px', overflowY: 'auto' }}>
+                {searchResults.map(product => (
+                  <div 
+                    key={product.itemId} 
+                    onClick={() => handleProductSelected(product)}
+                    style={{ 
+                      background: '#f9fafb', 
+                      margin: '8px 0', 
+                      padding: '16px', 
+                      borderRadius: '8px',
+                      border: '2px solid #e5e7eb',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s'
+                    }}
+                    onMouseOver={(e) => e.target.style.borderColor = '#3b82f6'}
+                    onMouseOut={(e) => e.target.style.borderColor = '#e5e7eb'}
+                  >
+                    <div style={{ fontWeight: '600', color: '#1f2937', marginBottom: '8px' }}>
+                      {product.brand} {product.name} {product.bottleSize}
+                    </div>
+                    <div style={{ fontSize: '14px', color: '#6b7280' }}>
+                      Current ID: {product.itemId} • Stock: {product.currentStock} • ${product.price}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* No Results Found */}
+          {searchTerm.length >= 2 && searchResults.length === 0 && (
+            <div style={{ textAlign: 'center', padding: '30px', background: '#f3f4f6', borderRadius: '8px', marginBottom: '24px' }}>
+              <p style={{ color: '#6b7280', marginBottom: '16px' }}>
+                No existing products found matching "{searchTerm}"
+              </p>
+              <button 
+                onClick={() => {
+                  setNewProduct({...newProduct, itemId: scannedBarcode});
+                  setScreen('newProduct');
+                }}
+                style={{...buttonStyle, background: '#10b981', margin: '0 auto', maxWidth: '300px'}}
+              >
+                ➕ Add as New Product
+              </button>
+            </div>
+          )}
+
+          {/* Option to add as new product */}
+          <div style={{ textAlign: 'center', marginTop: '30px' }}>
+            <p style={{ color: '#6b7280', marginBottom: '16px' }}>
+              Can't find the product you're looking for?
+            </p>
+            <button 
+              onClick={() => {
+                setNewProduct({...newProduct, itemId: scannedBarcode});
+                setScreen('newProduct');
+              }}
+              style={{...buttonStyle, background: '#10b981'}}
+            >
+              ➕ Add as New Product
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // EDIT PRODUCT SCREEN
+  if (screen === 'editProduct') {
+    return (
+      <div style={containerStyle}>
+        <div style={cardStyle}>
+          <div style={{ display: 'flex', alignItems: 'center', marginBottom: '24px' }}>
+            <button 
+              onClick={cancelAndGoHome}
+              style={{ 
+                background: 'none', 
+                border: 'none', 
+                cursor: 'pointer', 
+                fontSize: '24px',
+                marginRight: '12px'
+              }}
+            >
+              ⬅️
+            </button>
+            <h2 style={{ fontSize: '28px', fontWeight: 'bold', color: '#1f2937', margin: 0 }}>
+              Update Product
             </h2>
           </div>
 
@@ -468,147 +644,159 @@ const NEXAAddInventoryApp = () => {
             </div>
           )}
 
-          {!selectedProduct ? (
-            <>
-              {/* Search Interface */}
-              <div style={{ marginBottom: '24px' }}>
-                <label style={labelStyle}>Search Products</label>
+          {/* Update Confirmation */}
+          <div style={{ background: '#fef3c7', padding: '16px', borderRadius: '8px', marginBottom: '24px', border: '2px solid #fbbf24' }}>
+            <h3 style={{ color: '#92400e', marginTop: 0, marginBottom: '12px' }}>⚠️ Update Item ID?</h3>
+            <p style={{ color: '#92400e', marginBottom: '8px' }}>
+              Change barcode from <strong>{originalItemId}</strong> to <strong style={{ color: '#dc2626' }}>{newItemId}</strong>
+            </p>
+            <p style={{ color: '#92400e', fontSize: '14px', margin: 0 }}>
+              You can also edit other product details below.
+            </p>
+          </div>
+
+          <form onSubmit={handleEditProductSubmit}>
+            {/* Item ID - highlighted in red */}
+            <label style={labelStyle}>Item ID / Barcode *</label>
+            <input
+              type="text"
+              value={editingProduct?.itemId || ''}
+              onChange={(e) => setEditingProduct({...editingProduct, itemId: e.target.value})}
+              style={{
+                ...inputStyle, 
+                borderColor: '#dc2626', 
+                color: '#dc2626', 
+                fontWeight: 'bold',
+                backgroundColor: '#fef2f2'
+              }}
+              required
+            />
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '16px' }}>
+              <div>
+                <label style={labelStyle}>Brand</label>
                 <input
                   type="text"
-                  value={searchTerm}
-                  onChange={(e) => handleSearch(e.target.value)}
-                  placeholder="Search by product name, brand, or current barcode..."
+                  value={editingProduct?.brand || ''}
+                  onChange={(e) => setEditingProduct({...editingProduct, brand: e.target.value})}
                   style={inputStyle}
                 />
-                <p style={{ fontSize: '14px', color: '#6b7280', marginTop: '8px' }}>
-                  Type at least 2 characters to search through {inventory.length} products
-                </p>
               </div>
-
-              {/* Search Results */}
-              {searchResults.length > 0 && (
-                <div>
-                  <h3 style={{ color: '#374151', marginBottom: '16px' }}>
-                    🔍 Found {searchResults.length} product{searchResults.length !== 1 ? 's' : ''}:
-                  </h3>
-                  <div style={{ maxHeight: '400px', overflowY: 'auto' }}>
-                    {searchResults.map(product => (
-                      <div 
-                        key={product.itemId} 
-                        onClick={() => {
-                          setSelectedProduct(product);
-                          setNewItemId(product.itemId);
-                        }}
-                        style={{ 
-                          background: '#f9fafb', 
-                          margin: '8px 0', 
-                          padding: '16px', 
-                          borderRadius: '8px',
-                          border: '2px solid #e5e7eb',
-                          cursor: 'pointer',
-                          transition: 'all 0.2s'
-                        }}
-                        onMouseOver={(e) => e.target.style.borderColor = '#f59e0b'}
-                        onMouseOut={(e) => e.target.style.borderColor = '#e5e7eb'}
-                      >
-                        <div style={{ fontWeight: '600', color: '#1f2937', marginBottom: '8px' }}>
-                          {product.brand} {product.name} {product.bottleSize}
-                        </div>
-                        <div style={{ fontSize: '14px', color: '#6b7280', marginBottom: '4px' }}>
-                          Current Barcode: <strong>{product.itemId}</strong>
-                        </div>
-                        <div style={{ fontSize: '14px', color: '#6b7280' }}>
-                          Stock: {product.currentStock} • Price: ${product.price} • {product.vendor}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {searchTerm.length >= 2 && searchResults.length === 0 && (
-                <div style={{ textAlign: 'center', padding: '40px', color: '#6b7280' }}>
-                  <p>No products found matching "{searchTerm}"</p>
-                  <p style={{ fontSize: '14px', marginTop: '16px' }}>
-                    Try searching by:
-                  </p>
-                  <ul style={{ textAlign: 'left', display: 'inline-block', fontSize: '14px' }}>
-                    <li>Product name (e.g. "neutral")</li>
-                    <li>Brand name (e.g. "calura")</li>
-                    <li>Current barcode/ID</li>
-                  </ul>
-                </div>
-              )}
-            </>
-          ) : (
-            <>
-              {/* Update ItemId Interface */}
-              <div style={{ background: '#fef3c7', padding: '16px', borderRadius: '8px', marginBottom: '24px' }}>
-                <h3 style={{ color: '#92400e', marginTop: 0, marginBottom: '8px' }}>Selected Product:</h3>
-                <p style={{ color: '#92400e', marginBottom: '8px' }}>
-                  <strong>{selectedProduct.brand} {selectedProduct.name} {selectedProduct.bottleSize}</strong>
-                </p>
-                <p style={{ color: '#92400e', fontSize: '14px', margin: 0 }}>
-                  Current Barcode: <strong>{selectedProduct.itemId}</strong>
-                </p>
-              </div>
-
-              <form onSubmit={handleItemIdUpdate}>
-                <label style={labelStyle}>New Barcode / Item ID *</label>
+              <div>
+                <label style={labelStyle}>Size</label>
                 <input
                   type="text"
-                  value={newItemId}
-                  onChange={(e) => setNewItemId(e.target.value)}
-                  placeholder="Enter new barcode or Item ID"
+                  value={editingProduct?.bottleSize || ''}
+                  onChange={(e) => setEditingProduct({...editingProduct, bottleSize: e.target.value})}
                   style={inputStyle}
-                  required
                 />
+              </div>
+            </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginTop: '24px' }}>
-                  <button 
-                    type="button"
-                    onClick={() => {
-                      setSelectedProduct(null);
-                      setNewItemId('');
-                    }}
-                    style={{
-                      ...buttonStyle,
-                      background: '#6b7280',
-                      margin: 0
-                    }}
-                  >
-                    ↩️ Back to Search
-                  </button>
+            <label style={labelStyle}>Product Name *</label>
+            <input
+              type="text"
+              value={editingProduct?.name || ''}
+              onChange={(e) => setEditingProduct({...editingProduct, name: e.target.value})}
+              style={inputStyle}
+              required
+            />
 
-                  <button 
-                    type="submit"
-                    disabled={processing}
-                    style={{
-                      ...buttonStyle,
-                      background: processing ? '#9ca3af' : '#f59e0b',
-                      cursor: processing ? 'not-allowed' : 'pointer',
-                      margin: 0
-                    }}
-                  >
-                    {processing ? '⏳ Updating...' : '✅ Update Barcode'}
-                  </button>
-                </div>
-              </form>
-            </>
-          )}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px', marginBottom: '16px' }}>
+              <div>
+                <label style={labelStyle}>Price ($)</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  value={editingProduct?.price || ''}
+                  onChange={(e) => setEditingProduct({...editingProduct, price: e.target.value})}
+                  style={inputStyle}
+                />
+              </div>
+              <div>
+                <label style={labelStyle}>Add Quantity</label>
+                <input
+                  type="number"
+                  value={editingProduct?.quantity || 1}
+                  onChange={(e) => setEditingProduct({...editingProduct, quantity: parseInt(e.target.value) || 1})}
+                  style={inputStyle}
+                  min="1"
+                />
+              </div>
+              <div>
+                <label style={labelStyle}>Min Stock</label>
+                <input
+                  type="number"
+                  value={editingProduct?.minimum || ''}
+                  onChange={(e) => setEditingProduct({...editingProduct, minimum: e.target.value})}
+                  style={inputStyle}
+                />
+              </div>
+            </div>
+
+            <label style={labelStyle}>Vendor</label>
+            <input
+              type="text"
+              value={editingProduct?.vendor || ''}
+              onChange={(e) => setEditingProduct({...editingProduct, vendor: e.target.value})}
+              style={inputStyle}
+            />
+
+            <label style={labelStyle}>Vendor Contact</label>
+            <input
+              type="email"
+              value={editingProduct?.vendorContact || ''}
+              onChange={(e) => setEditingProduct({...editingProduct, vendorContact: e.target.value})}
+              style={inputStyle}
+            />
+
+            <label style={labelStyle}>Notes</label>
+            <textarea
+              value={editingProduct?.notes || ''}
+              onChange={(e) => setEditingProduct({...editingProduct, notes: e.target.value})}
+              style={{...inputStyle, minHeight: '80px', resize: 'vertical'}}
+            />
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginTop: '24px' }}>
+              <button 
+                type="button"
+                onClick={cancelAndGoHome}
+                style={{
+                  ...buttonStyle,
+                  background: '#6b7280',
+                  margin: 0
+                }}
+              >
+                ❌ Cancel
+              </button>
+
+              <button 
+                type="submit"
+                disabled={processing}
+                style={{
+                  ...buttonStyle,
+                  background: processing ? '#9ca3af' : '#dc2626',
+                  cursor: processing ? 'not-allowed' : 'pointer',
+                  margin: 0
+                }}
+              >
+                {processing ? '⏳ Updating...' : '✅ Update Product'}
+              </button>
+            </div>
+          </form>
         </div>
       </div>
     );
   }
 
-  // NEW PRODUCT FORM SCREEN (keeping existing functionality)
+  // NEW PRODUCT FORM SCREEN
   if (screen === 'newProduct') {
     return (
       <div style={containerStyle}>
         <div style={cardStyle}>
           <div style={{ display: 'flex', alignItems: 'center', marginBottom: '24px' }}>
             <button 
-              onClick={() => setScreen('home')}
+              onClick={cancelAndGoHome}
               style={{ 
                 background: 'none', 
                 border: 'none', 
@@ -635,6 +823,14 @@ const NEXAAddInventoryApp = () => {
               color: statusMessage.includes('✅') ? '#065f46' : '#991b1b'
             }}>
               {statusMessage}
+            </div>
+          )}
+
+          {scannedBarcode && (
+            <div style={{ background: '#dbeafe', padding: '16px', borderRadius: '8px', marginBottom: '24px' }}>
+              <p style={{ color: '#1e40af', margin: 0 }}>
+                📱 <strong>Scanned Barcode:</strong> {scannedBarcode}
+              </p>
             </div>
           )}
 
@@ -751,14 +947,14 @@ const NEXAAddInventoryApp = () => {
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginTop: '24px' }}>
               <button 
                 type="button"
-                onClick={clearForm}
+                onClick={cancelAndGoHome}
                 style={{
                   ...buttonStyle,
                   background: '#6b7280',
                   margin: 0
                 }}
               >
-                🗑️ Clear Form
+                ❌ Cancel
               </button>
 
               <button 
