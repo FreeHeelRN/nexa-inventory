@@ -4,6 +4,7 @@ const NEXAAddInventoryApp = () => {
   const [screen, setScreen] = useState('home');
   const [scannedItems, setScannedItems] = useState([]);
   const [processing, setProcessing] = useState(false);
+  const [debugInfo, setDebugInfo] = useState('');
 
   const GOOGLE_SHEETS_CONFIG = {
     SHEET_ID: '1U1SmQThzUECR_0uFDmTIa4M_lyKgKyTqnhbsQl-zhK8',
@@ -20,6 +21,7 @@ const NEXAAddInventoryApp = () => {
     try {
       setLoading(true);
       setError(null);
+      setDebugInfo('Fetching inventory...');
       
       const url = `https://sheets.googleapis.com/v4/spreadsheets/${GOOGLE_SHEETS_CONFIG.SHEET_ID}/values/${GOOGLE_SHEETS_CONFIG.RANGE}?key=${GOOGLE_SHEETS_CONFIG.API_KEY}`;
       
@@ -45,43 +47,97 @@ const NEXAAddInventoryApp = () => {
       
       setInventory(inventoryData);
       setLoading(false);
+      setDebugInfo(`Loaded ${inventoryData.length} products successfully`);
       
     } catch (err) {
       setError(err.message);
       setLoading(false);
+      setDebugInfo(`Read error: ${err.message}`);
     }
   };
 
   const updateStock = async (itemId, quantity) => {
     setProcessing(true);
+    setDebugInfo('Starting stock update...');
+    
     try {
+      setDebugInfo(`Sending POST to: ${GOOGLE_SHEETS_CONFIG.SCRIPT_URL}`);
+      
+      const requestBody = { 
+        action: 'updateStock', 
+        itemId: itemId, 
+        quantity: quantity 
+      };
+      
+      setDebugInfo(`Request body: ${JSON.stringify(requestBody)}`);
+
       const response = await fetch(GOOGLE_SHEETS_CONFIG.SCRIPT_URL, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'updateStock', itemId, quantity })
+        headers: { 
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify(requestBody)
       });
 
-      const result = await response.json();
+      setDebugInfo(`Response status: ${response.status} ${response.statusText}`);
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      const responseText = await response.text();
+      setDebugInfo(`Raw response: ${responseText}`);
+
+      let result;
+      try {
+        result = JSON.parse(responseText);
+      } catch (parseError) {
+        throw new Error(`Invalid JSON response: ${responseText}`);
+      }
+
       if (result.success) {
-        alert(`Stock updated! New stock: ${result.newStock}`);
-        await fetchInventory(); // Refresh to show changes
+        setDebugInfo(`Success! New stock: ${result.newStock}`);
+        alert(`Stock updated! ${itemId} new stock: ${result.newStock}`);
+        await fetchInventory();
         return true;
       } else {
-        alert('Error: ' + result.error);
+        setDebugInfo(`Server error: ${result.error}`);
+        alert('Server error: ' + result.error);
         return false;
       }
+      
     } catch (error) {
-      alert('Connection error: ' + error.message);
+      const errorMsg = `Connection error: ${error.message}`;
+      setDebugInfo(errorMsg);
+      alert(errorMsg);
       return false;
     } finally {
       setProcessing(false);
     }
   };
 
+  const testDirectConnection = async () => {
+    setDebugInfo('Testing direct connection...');
+    try {
+      const response = await fetch(GOOGLE_SHEETS_CONFIG.SCRIPT_URL);
+      const text = await response.text();
+      setDebugInfo(`Direct GET response: ${text}`);
+      alert(`Direct connection works: ${text}`);
+    } catch (error) {
+      const errorMsg = `Direct connection failed: ${error.message}`;
+      setDebugInfo(errorMsg);
+      alert(errorMsg);
+    }
+  };
+
   const testAddStock = async () => {
     if (inventory.length > 0) {
       const firstProduct = inventory[0];
+      setDebugInfo(`Testing with product: ${firstProduct.itemId} (${firstProduct.name})`);
       await updateStock(firstProduct.itemId, 1);
+    } else {
+      setDebugInfo('No inventory loaded to test with');
     }
   };
 
@@ -96,7 +152,7 @@ const NEXAAddInventoryApp = () => {
   };
 
   const cardStyle = {
-    maxWidth: '500px',
+    maxWidth: '600px',
     margin: '0 auto',
     background: 'white',
     borderRadius: '10px',
@@ -156,6 +212,13 @@ const NEXAAddInventoryApp = () => {
         )}
 
         <button 
+          onClick={testDirectConnection}
+          style={{...buttonStyle, background: '#17a2b8'}}
+        >
+          Test Direct Connection
+        </button>
+
+        <button 
           onClick={testAddStock}
           disabled={processing}
           style={{
@@ -173,9 +236,24 @@ const NEXAAddInventoryApp = () => {
           Refresh Inventory
         </button>
 
-        <div style={{ marginTop: '30px' }}>
-          <h3>First 5 Products:</h3>
-          {inventory.slice(0, 5).map(product => (
+        {/* Debug Information */}
+        <div style={{ 
+          marginTop: '30px', 
+          background: '#f8f9fa', 
+          padding: '15px', 
+          borderRadius: '5px',
+          fontSize: '12px',
+          fontFamily: 'monospace'
+        }}>
+          <h4>Debug Info:</h4>
+          <div style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>
+            {debugInfo || 'No debug info yet'}
+          </div>
+        </div>
+
+        <div style={{ marginTop: '20px' }}>
+          <h3>First 3 Products:</h3>
+          {inventory.slice(0, 3).map(product => (
             <div key={product.itemId} style={{ 
               background: '#f8f9fa', 
               margin: '5px 0', 
@@ -184,7 +262,7 @@ const NEXAAddInventoryApp = () => {
               fontSize: '14px'
             }}>
               <strong>{product.brand} {product.name}</strong><br/>
-              Stock: {product.currentStock} | Price: ${product.price}
+              ID: {product.itemId} | Stock: {product.currentStock} | Price: ${product.price}
             </div>
           ))}
         </div>
