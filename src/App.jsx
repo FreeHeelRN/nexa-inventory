@@ -8,7 +8,8 @@ const NEXAAddInventoryApp = () => {
     SHEET_ID: '1U1SmQThzUECR_0uFDmTIa4M_lyKgKyTqnhbsQl-zhK8',
     API_KEY: 'AIzaSyBH70BfRf8m3qs2K4WqnUKzLD8E1YY6blo',
     RANGE: 'A:K',
-   SCRIPT_URL: 'https://script.google.com/macros/s/AKfycbwDKTHZd-Tl-IyB1SW_EHjBUkJntffkJ4AAJ2glvKM3NG0nqNTliaviU7dUzlkvT47axA/exec'
+    SCRIPT_URL: 'https://script.google.com/macros/s/AKfycbwDKTHZd-Tl-IyB1SW_EHjBUkJntffkJ4AAJ2glvKM3NG0nqNTliaviU7dUzlkvT47axA/exec'
+  };
 
   const [inventory, setInventory] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -110,26 +111,13 @@ const NEXAAddInventoryApp = () => {
   };
 
   // Alternative: Open Google Apps Script in new window
- // Alternative: Open Google Apps Script in new window
-const updateStockViaWindow = (itemId, quantity) => {
-  const params = new URLSearchParams({
-    action: 'updateStock',
-    itemId: itemId,
-    quantity: quantity.toString()
-  });
-  
-  const url = `${GOOGLE_SHEETS_CONFIG.SCRIPT_URL}?${params.toString()}`;
-  
-  setDebugInfo(`Opening: ${url}`);
-  
-  const popup = window.open(url, 'stock_update', 'width=600,height=400,scrollbars=yes');
-  
-  if (popup) {
-    alert(`Update window opened!\n\nThe popup should show either:\n- SUCCESS: Updated stock\n- ERROR: [error message]\n\nAfter reading the result, close the popup and click "Refresh Inventory"`);
-  } else {
-    alert('Popup was blocked. Please allow popups for this site and try again.');
-  }
-};
+  const updateStockViaWindow = (itemId, quantity) => {
+    const url = `${GOOGLE_SHEETS_CONFIG.SCRIPT_URL}?action=updateStock&itemId=${itemId}&quantity=${quantity}`;
+    const popup = window.open(url, 'stock_update', 'width=500,height=300');
+    
+    setDebugInfo(`Opened update window for ${itemId}`);
+    alert(`Update window opened!\n\nThe stock should be updated automatically.\nClose the popup window and click "Refresh Inventory" to see changes.`);
+  };
 
   const testAddStock = () => {
     if (inventory.length > 0) {
@@ -267,5 +255,3 @@ const updateStockViaWindow = (itemId, quantity) => {
     </div>
   );
 };
-
-export default NEXAAddInventoryApp;
