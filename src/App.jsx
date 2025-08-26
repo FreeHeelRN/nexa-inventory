@@ -9,7 +9,7 @@ const NEXAAddInventoryApp = () => {
     SHEET_ID: '1U1SmQThzUECR_0uFDmTIa4M_lyKgKyTqnhbsQl-zhK8',
     API_KEY: 'AIzaSyBH70BfRf8m3qs2K4WqnUKzLD8E1YY6blo',
     RANGE: 'A:K',
-    SCRIPT_URL: 'https://script.google.com/macros/s/AKfycbwDKTHZd-Tl-IyB1SW_EHjBUkJntffkJ4AAJ2glvKM3NG0nqNTliaviU7dUzlkvT47axA/exec'
+    SCRIPT_URL: 'https://script.google.com/macros/s/AKfycbxuRWjKteYzumXLMJClMELECCwOaM5t89kbpb96Pd3Vq1G4bYeRjEi94PhP70EtGyy2PQ/exec'
   };
 
   const [inventory, setInventory] = useState([]);
@@ -60,7 +60,6 @@ const NEXAAddInventoryApp = () => {
     setDebugInfo(`Starting update for ItemID: "${itemId}" with quantity: ${quantity}`);
     
     try {
-      // Build the URL with parameters
       const baseUrl = GOOGLE_SHEETS_CONFIG.SCRIPT_URL;
       const params = new URLSearchParams({
         action: 'updateStock',
@@ -69,7 +68,7 @@ const NEXAAddInventoryApp = () => {
       });
       const fullUrl = `${baseUrl}?${params.toString()}`;
       
-      setDebugInfo(`Full URL being called: ${fullUrl}`);
+      setDebugInfo(`Calling URL: ${fullUrl}`);
       
       const response = await fetch(fullUrl);
       setDebugInfo(`Response status: ${response.status} ${response.statusText}`);
@@ -79,31 +78,23 @@ const NEXAAddInventoryApp = () => {
       }
 
       const responseText = await response.text();
-      setDebugInfo(`Raw response text: "${responseText}"`);
+      setDebugInfo(`Response: ${responseText}`);
 
-      // Check if response indicates success or error
       if (responseText.includes('SUCCESS')) {
         setLastUpdate(`✅ Updated ${itemId} at ${new Date().toLocaleTimeString()}`);
-        setDebugInfo(`${responseText}\n\nWill refresh inventory in 2 seconds...`);
-        
-        // Show success alert
         alert(`✅ ${responseText}`);
         
-        // Refresh inventory after 2 seconds
         setTimeout(() => {
           fetchInventory();
         }, 2000);
         return true;
         
       } else if (responseText.includes('ERROR')) {
-        setDebugInfo(`Server returned error: ${responseText}`);
         alert(`❌ ${responseText}`);
         return false;
         
       } else {
-        // This is our current problem - getting the default API message
-        setDebugInfo(`Unexpected response (parameters not processed): ${responseText}`);
-        alert(`⚠️ Script received request but didn't process parameters.\n\nResponse: ${responseText}`);
+        alert(`⚠️ Unexpected response: ${responseText}`);
         return false;
       }
       
@@ -122,8 +113,8 @@ const NEXAAddInventoryApp = () => {
     try {
       const response = await fetch(GOOGLE_SHEETS_CONFIG.SCRIPT_URL);
       const text = await response.text();
-      setDebugInfo(`Direct connection response: "${text}"`);
-      alert(`✅ Direct connection works:\n${text}`);
+      setDebugInfo(`Direct connection: ${text}`);
+      alert(`✅ Connection test successful!`);
     } catch (error) {
       const errorMsg = `Direct connection failed: ${error.message}`;
       setDebugInfo(errorMsg);
@@ -131,29 +122,10 @@ const NEXAAddInventoryApp = () => {
     }
   };
 
-  const testManualUrl = () => {
-    if (inventory.length > 0) {
-      const firstProduct = inventory[0];
-      const params = new URLSearchParams({
-        action: 'updateStock',
-        itemId: firstProduct.itemId,
-        quantity: '1'
-      });
-      const testUrl = `${GOOGLE_SHEETS_CONFIG.SCRIPT_URL}?${params.toString()}`;
-      
-      setDebugInfo(`Opening test URL in new window: ${testUrl}`);
-      
-      // Open in new window so you can see the response
-      window.open(testUrl, '_blank', 'width=800,height=400');
-      
-      alert(`🔍 Opened test URL in new window.\n\nIf it shows "SUCCESS" message, the script works.\nIf it shows "API is running", there's a parameter issue.`);
-    }
-  };
-
   const testAddStock = async () => {
     if (inventory.length > 0) {
       const firstProduct = inventory[0];
-      setDebugInfo(`Preparing to update: ${firstProduct.brand} ${firstProduct.name} (ID: "${firstProduct.itemId}")`);
+      setDebugInfo(`Testing stock update for: ${firstProduct.brand} ${firstProduct.name} (ID: "${firstProduct.itemId}")`);
       await updateStockViaGet(firstProduct.itemId, 1);
     } else {
       setDebugInfo('No inventory loaded to test with');
@@ -253,14 +225,7 @@ const NEXAAddInventoryApp = () => {
           onClick={testDirectConnection}
           style={{...buttonStyle, background: '#17a2b8'}}
         >
-          🔌 Test Basic Connection
-        </button>
-
-        <button 
-          onClick={testManualUrl}
-          style={{...buttonStyle, background: '#ffc107', color: '#212529'}}
-        >
-          🔍 Test URL in New Window
+          🔌 Test Connection
         </button>
 
         <button 
@@ -286,11 +251,11 @@ const NEXAAddInventoryApp = () => {
           background: '#f8f9fa', 
           padding: '15px', 
           borderRadius: '5px',
-          fontSize: '11px',
+          fontSize: '12px',
           fontFamily: 'monospace'
         }}>
-          <h4>📝 Debug Info:</h4>
-          <div style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-all', maxHeight: '200px', overflowY: 'auto' }}>
+          <h4>📝 Status:</h4>
+          <div style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-all', maxHeight: '150px', overflowY: 'auto' }}>
             {debugInfo || 'Ready to test...'}
           </div>
         </div>
