@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 
 const NEXAAddInventoryApp = () => {
+  const [screen, setScreen] = useState('home');
+  const [scannedItems, setScannedItems] = useState([]);
   const [processing, setProcessing] = useState(false);
   const [debugInfo, setDebugInfo] = useState('');
 
@@ -54,85 +56,88 @@ const NEXAAddInventoryApp = () => {
     }
   };
 
-  // CORS workaround - use hidden form submission
-  const updateStockViaForm = (itemId, quantity) => {
+  const updateStock = async (itemId, quantity) => {
     setProcessing(true);
-    setDebugInfo(`Updating stock for ${itemId} by ${quantity}...`);
-
-    // Create hidden form
-    const form = document.createElement('form');
-    form.method = 'POST';
-    form.action = GOOGLE_SHEETS_CONFIG.SCRIPT_URL;
-    form.target = 'hidden_iframe';
-    form.style.display = 'none';
-
-    // Add data as form fields
-    const actionField = document.createElement('input');
-    actionField.name = 'action';
-    actionField.value = 'updateStock';
-    form.appendChild(actionField);
-
-    const itemIdField = document.createElement('input');
-    itemIdField.name = 'itemId';
-    itemIdField.value = itemId;
-    form.appendChild(itemIdField);
-
-    const quantityField = document.createElement('input');
-    quantityField.name = 'quantity';
-    quantityField.value = quantity;
-    form.appendChild(quantityField);
-
-    // Create hidden iframe to catch response
-    let iframe = document.getElementById('hidden_iframe');
-    if (!iframe) {
-      iframe = document.createElement('iframe');
-      iframe.id = 'hidden_iframe';
-      iframe.name = 'hidden_iframe';
-      iframe.style.display = 'none';
-      document.body.appendChild(iframe);
-    }
-
-    // Submit form
-    document.body.appendChild(form);
-    form.submit();
-    document.body.removeChild(form);
-
-    // Simulate success (since we can't read the response due to CORS)
-    setTimeout(() => {
-      setProcessing(false);
-      setDebugInfo(`Form submitted successfully for ${itemId}`);
-      alert(`Stock update submitted for ${itemId}!\n\nCheck your Google Sheet to confirm the change.`);
-      
-      // Refresh inventory to show changes
-      setTimeout(() => {
-        fetchInventory();
-      }, 2000);
-    }, 1000);
-  };
-
-  // Alternative: Open Google Apps Script in new window
-  const updateStockViaWindow = (itemId, quantity) => {
-    const url = `${GOOGLE_SHEETS_CONFIG.SCRIPT_URL}?action=updateStock&itemId=${itemId}&quantity=${quantity}`;
-    const popup = window.open(url, 'stock_update', 'width=500,height=300');
+    setDebugInfo('Starting stock update...');
     
-    setDebugInfo(`Opened update window for ${itemId}`);
-    alert(`Update window opened!\n\nThe stock should be updated automatically.\nClose the popup window and click "Refresh Inventory" to see changes.`);
+    try {
+      setDebugInfo(`Sending POST to: ${GOOGLE_SHEETS_CONFIG.SCRIPT_URL}`);
+      
+      const requestBody = { 
+        action: 'updateStock', 
+        itemId: itemId, 
+        quantity: quantity 
+      };
+      
+      setDebugInfo(`Request body: ${JSON.stringify(requestBody)}`);
+
+      const response = await fetch(GOOGLE_SHEETS_CONFIG.SCRIPT_URL, {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify(requestBody)
+      });
+
+      setDebugInfo(`Response status: ${response.status} ${response.statusText}`);
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      const responseText = await response.text();
+      setDebugInfo(`Raw response: ${responseText}`);
+
+      let result;
+      try {
+        result = JSON.parse(responseText);
+      } catch (parseError) {
+        throw new Error(`Invalid JSON response: ${responseText}`);
+      }
+
+      if (result.success) {
+        setDebugInfo(`Success! New stock: ${result.newStock}`);
+        alert(`Stock updated! ${itemId} new stock: ${result.newStock}`);
+        await fetchInventory();
+        return true;
+      } else {
+        setDebugInfo(`Server error: ${result.error}`);
+        alert('Server error: ' + result.error);
+        return false;
+      }
+      
+    } catch (error) {
+      const errorMsg = `Connection error: ${error.message}`;
+      setDebugInfo(errorMsg);
+      alert(errorMsg);
+      return false;
+    } finally {
+      setProcessing(false);
+    }
   };
 
-  const testAddStock = () => {
+  const testDirectConnection = async () => {
+    setDebugInfo('Testing direct connection...');
+    try {
+      const response = await fetch(GOOGLE_SHEETS_CONFIG.SCRIPT_URL);
+      const text = await response.text();
+      setDebugInfo(`Direct GET response: ${text}`);
+      alert(`Direct connection works: ${text}`);
+    } catch (error) {
+      const errorMsg = `Direct connection failed: ${error.message}`;
+      setDebugInfo(errorMsg);
+      alert(errorMsg);
+    }
+  };
+
+  const testAddStock = async () => {
     if (inventory.length > 0) {
       const firstProduct = inventory[0];
-      const method = confirm(
-        `Update stock for: ${firstProduct.brand} ${firstProduct.name}\n\n` +
-        `Click OK for Form Method (hidden)\n` +
-        `Click Cancel for Window Method (visible popup)`
-      );
-      
-      if (method) {
-        updateStockViaForm(firstProduct.itemId, 1);
-      } else {
-        updateStockViaWindow(firstProduct.itemId, 1);
-      }
+      setDebugInfo(`Testing with product: ${firstProduct.itemId} (${firstProduct.name})`);
+      await updateStock(firstProduct.itemId, 1);
+    } else {
+      setDebugInfo('No inventory loaded to test with');
     }
   };
 
@@ -197,14 +202,21 @@ const NEXAAddInventoryApp = () => {
           NEXA
         </h1>
         <p style={{ textAlign: 'center', color: '#666', marginBottom: '30px' }}>
-          Inventory System ({inventory.length} products)
+          Connected to Google Sheets ({inventory.length} products)
         </p>
 
         {processing && (
           <div style={{ background: '#fff3cd', padding: '15px', borderRadius: '5px', marginBottom: '20px', textAlign: 'center' }}>
-            Processing update...
+            Updating Google Sheets...
           </div>
         )}
+
+        <button 
+          onClick={testDirectConnection}
+          style={{...buttonStyle, background: '#17a2b8'}}
+        >
+          Test Direct Connection
+        </button>
 
         <button 
           onClick={testAddStock}
@@ -214,7 +226,7 @@ const NEXAAddInventoryApp = () => {
             background: processing ? '#6c757d' : '#28a745'
           }}
         >
-          {processing ? 'Processing...' : 'Test: Add 1 to First Product'}
+          {processing ? 'Updating...' : 'Test: Add 1 to First Product'}
         </button>
 
         <button 
@@ -232,8 +244,10 @@ const NEXAAddInventoryApp = () => {
           fontSize: '12px',
           fontFamily: 'monospace'
         }}>
-          <h4>Status:</h4>
-          <div>{debugInfo || 'Ready to test'}</div>
+          <h4>Debug Info:</h4>
+          <div style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>
+            {debugInfo || 'No debug info yet'}
+          </div>
         </div>
 
         <div style={{ marginTop: '20px' }}>
@@ -255,3 +269,5 @@ const NEXAAddInventoryApp = () => {
     </div>
   );
 };
+
+export default NEXAAddInventoryApp;
