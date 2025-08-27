@@ -1,4 +1,4 @@
-// NEXA ADD Inventory - Working Version with Barcode Scanning
+// NEXA ADD Inventory - Working Version with Barcode Scanning 
 // Features: Barcode scan, Product search, Add new products, Google Sheets integrationimport React, { useState, useEffect } from 'react';
 
 const NEXAAddInventoryApp = () => {
