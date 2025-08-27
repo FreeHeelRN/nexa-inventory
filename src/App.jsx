@@ -712,7 +712,597 @@ TOTAL: $84.13
     );
   }
 
-  // ... (I need to add more screens in the next part to keep within limits)
+  // INVOICE REVIEW SCREEN (NEW!)
+  if (screen === 'invoiceReview') {
+    return (
+      <div style={containerStyle}>
+        <div style={cardStyle}>
+          <div style={{ textAlign: 'center', marginBottom: '30px' }}>
+            <h2 style={{ fontSize: '28px', fontWeight: 'bold', color: '#1f2937', marginBottom: '16px' }}>
+              📄 Invoice Review
+            </h2>
+            
+            <div style={{ background: '#f3f4f6', padding: '16px', borderRadius: '8px', marginBottom: '20px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px', textAlign: 'center' }}>
+                <div>
+                  <div style={{ fontSize: '12px', color: '#6b7280', marginBottom: '4px' }}>Invoice #</div>
+                  <div style={{ fontWeight: 'bold', color: '#1f2937' }}>{invoiceData.number || 'N/A'}</div>
+                </div>
+                <div>
+                  <div style={{ fontSize: '12px', color: '#6b7280', marginBottom: '4px' }}>Date</div>
+                  <div style={{ fontWeight: 'bold', color: '#1f2937' }}>{invoiceData.date || 'N/A'}</div>
+                </div>
+                <div>
+                  <div style={{ fontSize: '12px', color: '#6b7280', marginBottom: '4px' }}>Total</div>
+                  <div style={{ fontWeight: 'bold', color: '#1f2937' }}>${invoiceData.total || 'N/A'}</div>
+                </div>
+              </div>
+            </div>
+            
+            <p style={{ color: '#6b7280', fontSize: '16px' }}>
+              Found {detectedItems.length} products. Review and confirm below:
+            </p>
+          </div>
+
+          <div style={{ maxHeight: '400px', overflowY: 'auto', marginBottom: '20px' }}>
+            {detectedItems.map((item, index) => (
+              <div key={index} style={{
+                background: item.matched ? '#f0fdf4' : '#fef3c7',
+                border: item.matched ? '2px solid #bbf7d0' : '2px solid #fde68a',
+                padding: '16px',
+                margin: '12px 0',
+                borderRadius: '8px'
+              }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontWeight: 'bold', color: '#1f2937', marginBottom: '4px' }}>
+                      {item.matched ? `${item.brand} ${item.name}` : item.detectedName}
+                    </div>
+                    <div style={{ fontSize: '14px', color: '#6b7280', marginBottom: '8px' }}>
+                      {item.matched ? `✅ Matched in inventory` : '⚠️ Unknown product - needs details'}
+                    </div>
+                    <div style={{ fontSize: '14px', color: '#374151' }}>
+                      Qty: {item.quantity} • Price: ${item.detectedPrice} • Unit: ${item.unitPrice?.toFixed(2)}
+                    </div>
+                    {item.matched && (
+                      <div style={{ fontSize: '12px', color: '#059669', marginTop: '4px' }}>
+                        Current Stock: {item.currentStock} → {item.currentStock + item.quantity}
+                      </div>
+                    )}
+                  </div>
+                  
+                  <button
+                    onClick={() => removeDetectedItem(index)}
+                    style={{
+                      background: '#ef4444',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '6px',
+                      padding: '8px 12px',
+                      fontSize: '12px',
+                      cursor: 'pointer',
+                      marginLeft: '12px'
+                    }}
+                  >
+                    Remove
+                  </button>
+                </div>
+
+                {!item.matched && (
+                  <div style={{ borderTop: '1px solid #d1d5db', paddingTop: '12px' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px' }}>
+                      <div>
+                        <label style={labelStyle}>Item ID (Barcode)</label>
+                        <input
+                          type="text"
+                          value={item.itemId}
+                          onChange={(e) => updateDetectedItem(index, {...item, itemId: e.target.value})}
+                          style={{...inputStyle, marginBottom: '0'}}
+                          placeholder="Required"
+                        />
+                      </div>
+                      <div>
+                        <label style={labelStyle}>Brand</label>
+                        <input
+                          type="text"
+                          value={item.brand}
+                          onChange={(e) => updateDetectedItem(index, {...item, brand: e.target.value})}
+                          style={{...inputStyle, marginBottom: '0'}}
+                          placeholder="Optional"
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <label style={labelStyle}>Product Name</label>
+                      <input
+                        type="text"
+                        value={item.name}
+                        onChange={(e) => updateDetectedItem(index, {...item, name: e.target.value})}
+                        style={{...inputStyle, marginBottom: '0'}}
+                        placeholder="Required"
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+
+          {statusMessage && (
+            <div style={{ 
+              background: statusMessage.includes('✅') ? '#d1fae5' : '#fef2f2', 
+              border: statusMessage.includes('✅') ? '1px solid #a7f3d0' : '1px solid #fecaca',
+              padding: '12px', 
+              borderRadius: '6px', 
+              marginBottom: '20px', 
+              textAlign: 'center',
+              color: statusMessage.includes('✅') ? '#065f46' : '#991b1b',
+              fontSize: '14px'
+            }}>
+              {statusMessage}
+            </div>
+          )}
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+            <button
+              onClick={cancelAndGoHome}
+              style={{...buttonStyle, background: '#6b7280', margin: '0'}}
+            >
+              ❌ Cancel
+            </button>
+            <button
+              onClick={processInvoiceItems}
+              disabled={processing || detectedItems.length === 0}
+              style={{
+                ...buttonStyle,
+                background: processing ? '#9ca3af' : '#10b981',
+                cursor: processing ? 'not-allowed' : 'pointer',
+                margin: '0'
+              }}
+            >
+              {processing ? '⏳ Processing...' : `✅ Add All (${detectedItems.length})`}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // BARCODE NOT FOUND SCREEN
+  if (screen === 'barcodeNotFound') {
+    return (
+      <div style={containerStyle}>
+        <div style={cardStyle}>
+          <div style={{ textAlign: 'center', marginBottom: '30px' }}>
+            <h2 style={{ fontSize: '28px', fontWeight: 'bold', color: '#dc2626', marginBottom: '16px' }}>
+              🔍 Barcode Not Found
+            </h2>
+            <div style={{ background: '#fef2f2', padding: '16px', borderRadius: '8px', border: '1px solid #fecaca' }}>
+              <p style={{ fontSize: '18px', color: '#991b1b', marginBottom: '8px' }}>
+                Barcode: <strong>{scannedBarcode}</strong>
+              </p>
+              <p style={{ fontSize: '14px', color: '#6b7280' }}>
+                This barcode is not in your inventory database
+              </p>
+            </div>
+          </div>
+
+          <div style={{ marginBottom: '30px' }}>
+            <h3 style={{ color: '#374151', marginBottom: '16px' }}>What would you like to do?</h3>
+            
+            <button
+              onClick={() => {
+                setNewProduct({...newProduct, itemId: scannedBarcode});
+                setScreen('newProduct');
+              }}
+              style={{...buttonStyle, background: '#10b981', marginBottom: '12px'}}
+            >
+              ➕ Add as New Product
+            </button>
+
+            <div style={{ margin: '20px 0' }}>
+              <label style={labelStyle}>Search for existing product to update:</label>
+              <input
+                type="text"
+                value={searchTerm}
+                onChange={(e) => handleProductSearch(e.target.value)}
+                placeholder="Type brand or product name..."
+                style={inputStyle}
+              />
+            </div>
+
+            {searchResults.length > 0 && (
+              <div style={{ maxHeight: '200px', overflowY: 'auto', marginBottom: '20px' }}>
+                <h4 style={{ color: '#374151', marginBottom: '12px' }}>Search Results:</h4>
+                {searchResults.map(product => (
+                  <button
+                    key={product.itemId}
+                    onClick={() => handleProductSelected(product)}
+                    style={{
+                      width: '100%',
+                      padding: '12px',
+                      margin: '4px 0',
+                      background: '#f9fafb',
+                      border: '1px solid #e5e7eb',
+                      borderRadius: '6px',
+                      textAlign: 'left',
+                      cursor: 'pointer',
+                      fontSize: '14px'
+                    }}
+                  >
+                    <div style={{ fontWeight: '600', color: '#1f2937' }}>
+                      {product.brand} {product.name}
+                    </div>
+                    <div style={{ color: '#6b7280', fontSize: '12px' }}>
+                      Current ID: {product.itemId} • Stock: {product.currentStock}
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+            <button
+              onClick={cancelAndGoHome}
+              style={{...buttonStyle, background: '#6b7280', margin: '0'}}
+            >
+              ❌ Cancel
+            </button>
+            <button
+              onClick={() => setScreen('home')}
+              style={{...buttonStyle, background: '#3b82f6', margin: '0'}}
+            >
+              🏠 Back to Home
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // EDIT PRODUCT SCREEN
+  if (screen === 'editProduct') {
+    return (
+      <div style={containerStyle}>
+        <div style={cardStyle}>
+          <div style={{ textAlign: 'center', marginBottom: '30px' }}>
+            <h2 style={{ fontSize: '28px', fontWeight: 'bold', color: '#1f2937', marginBottom: '16px' }}>
+              ✏️ Edit Product
+            </h2>
+            <div style={{ background: '#dbeafe', padding: '12px', borderRadius: '6px', border: '1px solid #93c5fd' }}>
+              <p style={{ fontSize: '14px', color: '#1e40af' }}>
+                Updating barcode: <strong>{scannedBarcode}</strong> → <strong>{editingProduct?.itemId}</strong>
+              </p>
+            </div>
+          </div>
+
+          <form onSubmit={handleEditProductSubmit}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
+              <div>
+                <label style={labelStyle}>Item ID (Barcode) *</label>
+                <input
+                  type="text"
+                  value={editingProduct?.itemId || ''}
+                  onChange={(e) => setEditingProduct({...editingProduct, itemId: e.target.value})}
+                  style={inputStyle}
+                  required
+                />
+              </div>
+              <div>
+                <label style={labelStyle}>Brand</label>
+                <input
+                  type="text"
+                  value={editingProduct?.brand || ''}
+                  onChange={(e) => setEditingProduct({...editingProduct, brand: e.target.value})}
+                  style={inputStyle}
+                />
+              </div>
+            </div>
+
+            <div>
+              <label style={labelStyle}>Product Name *</label>
+              <input
+                type="text"
+                value={editingProduct?.name || ''}
+                onChange={(e) => setEditingProduct({...editingProduct, name: e.target.value})}
+                style={inputStyle}
+                required
+              />
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px', marginBottom: '16px' }}>
+              <div>
+                <label style={labelStyle}>Bottle Size</label>
+                <input
+                  type="text"
+                  value={editingProduct?.bottleSize || ''}
+                  onChange={(e) => setEditingProduct({...editingProduct, bottleSize: e.target.value})}
+                  style={inputStyle}
+                  placeholder="e.g., 32oz"
+                />
+              </div>
+              <div>
+                <label style={labelStyle}>Price ($)</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  value={editingProduct?.price || ''}
+                  onChange={(e) => setEditingProduct({...editingProduct, price: e.target.value})}
+                  style={inputStyle}
+                />
+              </div>
+              <div>
+                <label style={labelStyle}>Add Quantity</label>
+                <input
+                  type="number"
+                  min="1"
+                  value={editingProduct?.quantity || 1}
+                  onChange={(e) => setEditingProduct({...editingProduct, quantity: parseInt(e.target.value) || 1})}
+                  style={inputStyle}
+                />
+              </div>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '16px', marginBottom: '16px' }}>
+              <div>
+                <label style={labelStyle}>Minimum Stock</label>
+                <input
+                  type="number"
+                  min="0"
+                  value={editingProduct?.minimum || ''}
+                  onChange={(e) => setEditingProduct({...editingProduct, minimum: e.target.value})}
+                  style={inputStyle}
+                />
+              </div>
+              <div>
+                <label style={labelStyle}>Notes</label>
+                <input
+                  type="text"
+                  value={editingProduct?.notes || ''}
+                  onChange={(e) => setEditingProduct({...editingProduct, notes: e.target.value})}
+                  style={inputStyle}
+                  placeholder="Optional notes"
+                />
+              </div>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '24px' }}>
+              <div>
+                <label style={labelStyle}>Vendor</label>
+                <input
+                  type="text"
+                  value={editingProduct?.vendor || ''}
+                  onChange={(e) => setEditingProduct({...editingProduct, vendor: e.target.value})}
+                  style={inputStyle}
+                  placeholder="Supplier name"
+                />
+              </div>
+              <div>
+                <label style={labelStyle}>Vendor Contact</label>
+                <input
+                  type="text"
+                  value={editingProduct?.vendorContact || ''}
+                  onChange={(e) => setEditingProduct({...editingProduct, vendorContact: e.target.value})}
+                  style={inputStyle}
+                  placeholder="Phone/email"
+                />
+              </div>
+            </div>
+
+            {statusMessage && (
+              <div style={{ 
+                background: statusMessage.includes('✅') ? '#d1fae5' : '#fef2f2', 
+                border: statusMessage.includes('✅') ? '1px solid #a7f3d0' : '1px solid #fecaca',
+                padding: '12px', 
+                borderRadius: '6px', 
+                marginBottom: '20px', 
+                textAlign: 'center',
+                color: statusMessage.includes('✅') ? '#065f46' : '#991b1b'
+              }}>
+                {statusMessage}
+              </div>
+            )}
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+              <button
+                type="button"
+                onClick={cancelAndGoHome}
+                style={{...buttonStyle, background: '#6b7280', margin: '0'}}
+              >
+                ❌ Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={processing}
+                style={{
+                  ...buttonStyle,
+                  background: processing ? '#9ca3af' : '#10b981',
+                  cursor: processing ? 'not-allowed' : 'pointer',
+                  margin: '0'
+                }}
+              >
+                {processing ? '⏳ Updating...' : '✅ Update & Add Stock'}
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    );
+  }
+
+  // NEW PRODUCT SCREEN
+  if (screen === 'newProduct') {
+    return (
+      <div style={containerStyle}>
+        <div style={cardStyle}>
+          <div style={{ textAlign: 'center', marginBottom: '30px' }}>
+            <h2 style={{ fontSize: '28px', fontWeight: 'bold', color: '#1f2937', marginBottom: '16px' }}>
+              ➕ Add New Product
+            </h2>
+            <p style={{ color: '#6b7280', fontSize: '16px' }}>
+              Enter details for the new product
+            </p>
+          </div>
+
+          <form onSubmit={handleNewProductSubmit}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
+              <div>
+                <label style={labelStyle}>Item ID (Barcode) *</label>
+                <input
+                  type="text"
+                  value={newProduct.itemId}
+                  onChange={(e) => setNewProduct({...newProduct, itemId: e.target.value})}
+                  style={inputStyle}
+                  required
+                  placeholder={scannedBarcode || 'Enter barcode'}
+                />
+              </div>
+              <div>
+                <label style={labelStyle}>Brand</label>
+                <input
+                  type="text"
+                  value={newProduct.brand}
+                  onChange={(e) => setNewProduct({...newProduct, brand: e.target.value})}
+                  style={inputStyle}
+                  placeholder="e.g., Olaplex"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label style={labelStyle}>Product Name *</label>
+              <input
+                type="text"
+                value={newProduct.name}
+                onChange={(e) => setNewProduct({...newProduct, name: e.target.value})}
+                style={inputStyle}
+                required
+                placeholder="e.g., Bond Multiplier No.1"
+              />
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px', marginBottom: '16px' }}>
+              <div>
+                <label style={labelStyle}>Bottle Size</label>
+                <input
+                  type="text"
+                  value={newProduct.bottleSize}
+                  onChange={(e) => setNewProduct({...newProduct, bottleSize: e.target.value})}
+                  style={inputStyle}
+                  placeholder="e.g., 32oz"
+                />
+              </div>
+              <div>
+                <label style={labelStyle}>Price ($)</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  value={newProduct.price}
+                  onChange={(e) => setNewProduct({...newProduct, price: e.target.value})}
+                  style={inputStyle}
+                  placeholder="0.00"
+                />
+              </div>
+              <div>
+                <label style={labelStyle}>Initial Quantity</label>
+                <input
+                  type="number"
+                  min="1"
+                  value={newProduct.quantity}
+                  onChange={(e) => setNewProduct({...newProduct, quantity: parseInt(e.target.value) || 1})}
+                  style={inputStyle}
+                />
+              </div>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '16px', marginBottom: '16px' }}>
+              <div>
+                <label style={labelStyle}>Minimum Stock</label>
+                <input
+                  type="number"
+                  min="0"
+                  value={newProduct.minimum}
+                  onChange={(e) => setNewProduct({...newProduct, minimum: e.target.value})}
+                  style={inputStyle}
+                  placeholder="0"
+                />
+              </div>
+              <div>
+                <label style={labelStyle}>Notes</label>
+                <input
+                  type="text"
+                  value={newProduct.notes}
+                  onChange={(e) => setNewProduct({...newProduct, notes: e.target.value})}
+                  style={inputStyle}
+                  placeholder="Optional notes"
+                />
+              </div>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '24px' }}>
+              <div>
+                <label style={labelStyle}>Vendor</label>
+                <input
+                  type="text"
+                  value={newProduct.vendor}
+                  onChange={(e) => setNewProduct({...newProduct, vendor: e.target.value})}
+                  style={inputStyle}
+                  placeholder="Supplier name"
+                />
+              </div>
+              <div>
+                <label style={labelStyle}>Vendor Contact</label>
+                <input
+                  type="text"
+                  value={newProduct.vendorContact}
+                  onChange={(e) => setNewProduct({...newProduct, vendorContact: e.target.value})}
+                  style={inputStyle}
+                  placeholder="Phone/email"
+                />
+              </div>
+            </div>
+
+            {statusMessage && (
+              <div style={{ 
+                background: statusMessage.includes('✅') ? '#d1fae5' : '#fef2f2', 
+                border: statusMessage.includes('✅') ? '1px solid #a7f3d0' : '1px solid #fecaca',
+                padding: '12px', 
+                borderRadius: '6px', 
+                marginBottom: '20px', 
+                textAlign: 'center',
+                color: statusMessage.includes('✅') ? '#065f46' : '#991b1b'
+              }}>
+                {statusMessage}
+              </div>
+            )}
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+              <button
+                type="button"
+                onClick={cancelAndGoHome}
+                style={{...buttonStyle, background: '#6b7280', margin: '0'}}
+              >
+                ❌ Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={processing}
+                style={{
+                  ...buttonStyle,
+                  background: processing ? '#9ca3af' : '#10b981',
+                  cursor: processing ? 'not-allowed' : 'pointer',
+                  margin: '0'
+                }}
+              >
+                {processing ? '⏳ Adding...' : '✅ Add Product'}
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    );
+  }
 
   return null;
 };
