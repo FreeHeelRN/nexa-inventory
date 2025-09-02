@@ -181,6 +181,18 @@ const NEXAAddInventoryApp = () => {
     setScreen('editProduct');
   };
 
+  // Quick update barcode and add stock (NEW FEATURE)
+  const quickUpdateBarcode = async () => {
+    if (!editingProduct || !scannedBarcode) return;
+    
+    const updatedProduct = {
+      ...editingProduct,
+      itemId: scannedBarcode // Use the scanned barcode
+    };
+    
+    await updateProductInfo(updatedProduct);
+  };
+
   // Update product with new ItemId and other changes
   const updateProductInfo = async (productData) => {
     setProcessing(true);
@@ -609,7 +621,7 @@ const NEXAAddInventoryApp = () => {
     );
   }
 
-  // EDIT PRODUCT SCREEN
+  // EDIT PRODUCT SCREEN (WITH NEW QUICK UPDATE BUTTON)
   if (screen === 'editProduct') {
     return (
       <div style={containerStyle}>
@@ -650,11 +662,47 @@ const NEXAAddInventoryApp = () => {
           <div style={{ background: '#fef3c7', padding: '16px', borderRadius: '8px', marginBottom: '24px', border: '2px solid #fbbf24' }}>
             <h3 style={{ color: '#92400e', marginTop: 0, marginBottom: '12px' }}>⚠️ Update Item ID?</h3>
             <p style={{ color: '#92400e', marginBottom: '8px' }}>
-              Change barcode from <strong>{originalItemId}</strong> to <strong style={{ color: '#dc2626' }}>{newItemId}</strong>
+              Change barcode from <strong>{originalItemId}</strong> to <strong style={{ color: '#dc2626' }}>{scannedBarcode}</strong>
             </p>
             <p style={{ color: '#92400e', fontSize: '14px', margin: 0 }}>
-              You can also edit other product details below.
+              Use the quick update button below, or edit details manually.
             </p>
+          </div>
+
+          {/* QUICK UPDATE BUTTON - NEW FEATURE */}
+          <div style={{ marginBottom: '24px' }}>
+            <button 
+              onClick={quickUpdateBarcode}
+              disabled={processing}
+              style={{
+                ...buttonStyle,
+                background: processing ? '#9ca3af' : '#10b981',
+                cursor: processing ? 'not-allowed' : 'pointer',
+                fontSize: '20px',
+                padding: '20px',
+                border: '3px solid #065f46'
+              }}
+            >
+              {processing ? '⏳ Updating...' : `✅ Update Barcode to ${scannedBarcode} & Add 1 to Stock`}
+            </button>
+            <p style={{ textAlign: 'center', fontSize: '14px', color: '#6b7280', marginTop: '8px' }}>
+              Quick option: Updates barcode and adds 1 to inventory immediately
+            </p>
+          </div>
+
+          {/* OR DIVIDER */}
+          <div style={{ textAlign: 'center', margin: '24px 0' }}>
+            <div style={{ borderTop: '1px solid #e5e7eb', position: 'relative' }}>
+              <span style={{ 
+                background: 'white', 
+                color: '#6b7280', 
+                padding: '0 16px', 
+                position: 'relative', 
+                top: '-12px' 
+              }}>
+                OR edit details manually
+              </span>
+            </div>
           </div>
 
           <form onSubmit={handleEditProductSubmit}>
@@ -782,7 +830,7 @@ const NEXAAddInventoryApp = () => {
                   margin: 0
                 }}
               >
-                {processing ? '⏳ Updating...' : '✅ Update Product'}
+                {processing ? '⏳ Updating...' : '✅ Update with Changes'}
               </button>
             </div>
           </form>
