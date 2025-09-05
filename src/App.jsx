@@ -836,11 +836,14 @@ const NEXAAddInventoryApp = () => {
               📱 {processing ? 'Processing...' : 'ADD Inventory'}
             </button>
 
-            {/* 2. USE Inventory */}
+            {/* 2. USE Inventory - Same tab navigation */}
             <button 
-              onClick={() => {
-                window.open('https://nexa-inventory-git-use-inventory-kyle-harveys-projects.vercel.app', '_blank');
-              }}
+               onClick={() => {
+                  // Store current URL for back navigation
+                  sessionStorage.setItem('nexaReturnUrl', window.location.href);
+                  // Navigate to USE inventory in same tab
+                  window.location.href = 'https://nexa-use-inventory.vercel.app';
+                }}
               style={{
                 ...buttonStyle, 
                 background: '#dc2626',
