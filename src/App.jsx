@@ -839,14 +839,14 @@ const NEXAAddInventoryApp = () => {
             {/* 2. USE Inventory */}
             <button 
               onClick={() => {
-                window.open('https://nexa-inventory-use.vercel.app/', '_blank');
+                window.open('https://nexa-inventory-git-use-inventory-kyle-harveys-projects.vercel.app', '_blank');
               }}
               style={{
                 ...buttonStyle, 
                 background: '#dc2626',
                 fontSize: '18px'
               }}
-            >
+            >  
               🧪 USE Inventory
             </button>
 
