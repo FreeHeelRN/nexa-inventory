@@ -1,5 +1,5 @@
-// NEXA ADD Inventory - Complete System with Automatic Purchase Logging
-// Features: Barcode scan, Product search, Add new products, Google Sheets integration, Purchase tracking
+// NEXA ADD Inventory - Complete System with New Home Layout & Settings
+// Features: Barcode scan, Product search, Add new products, Google Sheets integration, Purchase tracking, Settings
 import React, { useState, useEffect } from 'react';
 
 const NEXAAddInventoryApp = () => {
@@ -18,6 +18,24 @@ const NEXAAddInventoryApp = () => {
   const [newItemId, setNewItemId] = useState('');
   const [originalItemId, setOriginalItemId] = useState('');
   
+  // NEW: Settings state
+  const [settings, setSettings] = useState({
+    defaultEmail: '',
+    savedEmails: ['user@example.com'],
+    defaultPhone: '',
+    savedPhones: ['555-0123'],
+    fiscalYearType: 'calendar', // 'calendar' or 'custom'
+    fiscalStartMonth: 7, // July = 7 (for July-June fiscal year)
+    username: ''
+  });
+  
+  // NEW: Settings form state
+  const [tempSettings, setTempSettings] = useState({});
+  const [showAddEmail, setShowAddEmail] = useState(false);
+  const [showAddPhone, setShowAddPhone] = useState(false);
+  const [newEmail, setNewEmail] = useState('');
+  const [newPhone, setNewPhone] = useState('');
+  
   const [newProduct, setNewProduct] = useState({
     itemId: '',
     brand: '',
@@ -31,7 +49,7 @@ const NEXAAddInventoryApp = () => {
     vendorContact: ''
   });
 
-  // Updated Google Sheets Configuration with NEW Apps Script URL
+  // Updated Google Sheets Configuration
   const GOOGLE_SHEETS_CONFIG = {
     SHEET_ID: '1U1SmQThzUECR_0uFDmTIa4M_lyKgKyTqnhbsQl-zhK8',
     API_KEY: 'AIzaSyBH70BfRf8m3qs2K4WqnUKzLD8E1YY6blo',
@@ -42,6 +60,41 @@ const NEXAAddInventoryApp = () => {
   const [inventory, setInventory] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+
+  // NEW: Load settings from localStorage on component mount
+  useEffect(() => {
+    const savedSettings = localStorage.getItem('nexaSettings');
+    if (savedSettings) {
+      try {
+        const parsedSettings = JSON.parse(savedSettings);
+        setSettings(prevSettings => ({
+          ...prevSettings,
+          ...parsedSettings
+        }));
+      } catch (error) {
+        console.warn('Failed to parse saved settings:', error);
+      }
+    }
+  }, []);
+
+  // NEW: Save settings to localStorage
+  const saveSettings = (newSettings) => {
+    try {
+      localStorage.setItem('nexaSettings', JSON.stringify(newSettings));
+      setSettings(newSettings);
+      setStatusMessage('✅ Settings saved successfully!');
+      setTimeout(() => setStatusMessage(''), 3000);
+    } catch (error) {
+      console.error('Failed to save settings:', error);
+      setStatusMessage('❌ Failed to save settings');
+    }
+  };
+
+  // NEW: Month names for fiscal year selector
+  const monthNames = [
+    'January', 'February', 'March', 'April', 'May', 'June',
+    'July', 'August', 'September', 'October', 'November', 'December'
+  ];
 
   const fetchInventory = async () => {
     try {
@@ -191,7 +244,7 @@ const NEXAAddInventoryApp = () => {
     setScreen('editProduct');
   };
 
-  // Quick update barcode and add stock (NEW FEATURE)
+  // Quick update barcode and add stock
   const quickUpdateBarcode = async () => {
     if (!editingProduct || !scannedBarcode) return;
     
@@ -347,6 +400,39 @@ const NEXAAddInventoryApp = () => {
     await addNewProductToInventory(newProduct);
   };
 
+  // NEW: Handle settings form submission
+  const handleSettingsSubmit = (e) => {
+    e.preventDefault();
+    saveSettings(tempSettings);
+    setScreen('home');
+  };
+
+  // NEW: Add new email to saved emails
+  const addNewEmailToSettings = () => {
+    if (newEmail.trim() && !tempSettings.savedEmails.includes(newEmail.trim())) {
+      setTempSettings({
+        ...tempSettings,
+        savedEmails: [...tempSettings.savedEmails, newEmail.trim()],
+        defaultEmail: newEmail.trim()
+      });
+      setNewEmail('');
+      setShowAddEmail(false);
+    }
+  };
+
+  // NEW: Add new phone to saved phones
+  const addNewPhoneToSettings = () => {
+    if (newPhone.trim() && !tempSettings.savedPhones.includes(newPhone.trim())) {
+      setTempSettings({
+        ...tempSettings,
+        savedPhones: [...tempSettings.savedPhones, newPhone.trim()],
+        defaultPhone: newPhone.trim()
+      });
+      setNewPhone('');
+      setShowAddPhone(false);
+    }
+  };
+
   // Cancel and reset to home
   const cancelAndGoHome = () => {
     setScreen('home');
@@ -445,7 +531,263 @@ const NEXAAddInventoryApp = () => {
     );
   }
 
-  // HOME SCREEN
+  // NEW: SETTINGS SCREEN
+  if (screen === 'settings') {
+    return (
+      <div style={containerStyle}>
+        <div style={cardStyle}>
+          <div style={{ display: 'flex', alignItems: 'center', marginBottom: '24px' }}>
+            <button 
+              onClick={() => setScreen('home')}
+              style={{ 
+                background: 'none', 
+                border: 'none', 
+                cursor: 'pointer', 
+                fontSize: '24px',
+                marginRight: '12px'
+              }}
+            >
+              ⬅️
+            </button>
+            <h2 style={{ fontSize: '28px', fontWeight: 'bold', color: '#1f2937', margin: 0 }}>
+              Settings
+            </h2>
+          </div>
+
+          {statusMessage && (
+            <div style={{ 
+              background: statusMessage.includes('✅') ? '#d1fae5' : '#fef2f2', 
+              border: statusMessage.includes('✅') ? '1px solid #a7f3d0' : '1px solid #fecaca',
+              padding: '16px', 
+              borderRadius: '8px', 
+              marginBottom: '24px', 
+              textAlign: 'center',
+              color: statusMessage.includes('✅') ? '#065f46' : '#991b1b',
+              fontSize: '14px'
+            }}>
+              {statusMessage}
+            </div>
+          )}
+
+          <form onSubmit={handleSettingsSubmit}>
+            {/* Default Email */}
+            <div style={{ marginBottom: '20px' }}>
+              <label style={labelStyle}>Default Email Address</label>
+              <div style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
+                <select 
+                  value={tempSettings.defaultEmail || settings.defaultEmail}
+                  onChange={(e) => setTempSettings({...tempSettings, defaultEmail: e.target.value})}
+                  style={{...inputStyle, flex: 1, marginBottom: 0}}
+                >
+                  <option value="">Select email...</option>
+                  {(tempSettings.savedEmails || settings.savedEmails).map(email => (
+                    <option key={email} value={email}>{email}</option>
+                  ))}
+                </select>
+                <button 
+                  type="button"
+                  onClick={() => setShowAddEmail(!showAddEmail)}
+                  style={{
+                    padding: '12px 16px',
+                    background: '#059669',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '6px',
+                    cursor: 'pointer',
+                    fontSize: '14px'
+                  }}
+                >
+                  {showAddEmail ? '❌' : '➕'}
+                </button>
+              </div>
+              
+              {showAddEmail && (
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <input
+                    type="email"
+                    value={newEmail}
+                    onChange={(e) => setNewEmail(e.target.value)}
+                    placeholder="Enter new email address"
+                    style={{...inputStyle, flex: 1, marginBottom: 0}}
+                  />
+                  <button 
+                    type="button"
+                    onClick={addNewEmailToSettings}
+                    style={{
+                      padding: '12px 16px',
+                      background: '#3b82f6',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '6px',
+                      cursor: 'pointer',
+                      fontSize: '14px'
+                    }}
+                  >
+                    Add
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* Default Phone */}
+            <div style={{ marginBottom: '20px' }}>
+              <label style={labelStyle}>Default Phone Number</label>
+              <div style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
+                <select 
+                  value={tempSettings.defaultPhone || settings.defaultPhone}
+                  onChange={(e) => setTempSettings({...tempSettings, defaultPhone: e.target.value})}
+                  style={{...inputStyle, flex: 1, marginBottom: 0}}
+                >
+                  <option value="">Select phone...</option>
+                  {(tempSettings.savedPhones || settings.savedPhones).map(phone => (
+                    <option key={phone} value={phone}>{phone}</option>
+                  ))}
+                </select>
+                <button 
+                  type="button"
+                  onClick={() => setShowAddPhone(!showAddPhone)}
+                  style={{
+                    padding: '12px 16px',
+                    background: '#059669',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '6px',
+                    cursor: 'pointer',
+                    fontSize: '14px'
+                  }}
+                >
+                  {showAddPhone ? '❌' : '➕'}
+                </button>
+              </div>
+              
+              {showAddPhone && (
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <input
+                    type="tel"
+                    value={newPhone}
+                    onChange={(e) => setNewPhone(e.target.value)}
+                    placeholder="Enter new phone number"
+                    style={{...inputStyle, flex: 1, marginBottom: 0}}
+                  />
+                  <button 
+                    type="button"
+                    onClick={addNewPhoneToSettings}
+                    style={{
+                      padding: '12px 16px',
+                      background: '#3b82f6',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '6px',
+                      cursor: 'pointer',
+                      fontSize: '14px'
+                    }}
+                  >
+                    Add
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* Fiscal Year Preference */}
+            <div style={{ marginBottom: '20px' }}>
+              <label style={labelStyle}>Fiscal Year Preference</label>
+              <select 
+                value={tempSettings.fiscalYearType || settings.fiscalYearType}
+                onChange={(e) => setTempSettings({...tempSettings, fiscalYearType: e.target.value})}
+                style={inputStyle}
+              >
+                <option value="calendar">Calendar Year (January - December)</option>
+                <option value="custom">Custom Fiscal Year</option>
+              </select>
+            </div>
+
+            {/* Custom Fiscal Year Start Month */}
+            {(tempSettings.fiscalYearType === 'custom' || (settings.fiscalYearType === 'custom' && !tempSettings.fiscalYearType)) && (
+              <div style={{ marginBottom: '20px' }}>
+                <label style={labelStyle}>Fiscal Year Start Month</label>
+                <select 
+                  value={tempSettings.fiscalStartMonth || settings.fiscalStartMonth}
+                  onChange={(e) => setTempSettings({...tempSettings, fiscalStartMonth: parseInt(e.target.value)})}
+                  style={inputStyle}
+                >
+                  {monthNames.map((month, index) => (
+                    <option key={index + 1} value={index + 1}>
+                      {month} (e.g., {month} {new Date().getFullYear()} - {monthNames[(index + 11) % 12]} {index >= 11 ? new Date().getFullYear() + 1 : new Date().getFullYear()})
+                    </option>
+                  ))}
+                </select>
+                <p style={{ fontSize: '12px', color: '#6b7280', marginTop: '4px' }}>
+                  Purchase logs will be organized by fiscal year instead of calendar year.
+                </p>
+              </div>
+            )}
+
+            {/* Username */}
+            <div style={{ marginBottom: '24px' }}>
+              <label style={labelStyle}>Username</label>
+              <input
+                type="text"
+                value={tempSettings.username !== undefined ? tempSettings.username : settings.username}
+                onChange={(e) => setTempSettings({...tempSettings, username: e.target.value})}
+                placeholder="Enter username for future login"
+                style={inputStyle}
+              />
+              <p style={{ fontSize: '12px', color: '#6b7280', marginTop: '4px' }}>
+                For future login functionality (not yet active)
+              </p>
+            </div>
+
+            {/* Buttons */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+              <button 
+                type="button"
+                onClick={() => {
+                  setTempSettings({});
+                  setScreen('home');
+                }}
+                style={{
+                  ...buttonStyle,
+                  background: '#6b7280',
+                  margin: 0
+                }}
+              >
+                ❌ Cancel
+              </button>
+
+              <button 
+                type="submit"
+                style={{
+                  ...buttonStyle,
+                  background: '#059669',
+                  margin: 0
+                }}
+              >
+                ✅ Save Settings
+              </button>
+            </div>
+          </form>
+
+          {/* Current Settings Preview */}
+          <div style={{ 
+            marginTop: '30px', 
+            padding: '16px', 
+            background: '#f8fafc', 
+            borderRadius: '8px',
+            fontSize: '12px',
+            color: '#64748b'
+          }}>
+            <h4 style={{ margin: '0 0 8px 0', color: '#374151' }}>Current Settings Preview:</h4>
+            <div>Email: {tempSettings.defaultEmail || settings.defaultEmail || 'Not set'}</div>
+            <div>Phone: {tempSettings.defaultPhone || settings.defaultPhone || 'Not set'}</div>
+            <div>Fiscal Year: {(tempSettings.fiscalYearType || settings.fiscalYearType) === 'calendar' ? 'Calendar Year' : `Custom (starts ${monthNames[(tempSettings.fiscalStartMonth || settings.fiscalStartMonth) - 1]})`}</div>
+            <div>Username: {tempSettings.username !== undefined ? tempSettings.username : (settings.username || 'Not set')}</div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // HOME SCREEN WITH NEW LAYOUT
   if (screen === 'home') {
     return (
       <div style={containerStyle}>
@@ -454,7 +796,7 @@ const NEXAAddInventoryApp = () => {
             <h1 style={{ fontSize: '42px', fontWeight: 'bold', color: '#1f2937', marginBottom: '8px' }}>
               NEXA
             </h1>
-            <p style={{ color: '#6b7280', fontSize: '18px' }}>Add Inventory System</p>
+            <p style={{ color: '#6b7280', fontSize: '18px' }}>Salon Inventory Management</p>
             <p style={{ fontSize: '14px', color: '#059669', marginTop: '8px' }}>
               📊 {inventory.length} products • 📈 Purchase tracking enabled
             </p>
@@ -469,7 +811,7 @@ const NEXAAddInventoryApp = () => {
               marginBottom: '24px', 
               textAlign: 'center',
               color: statusMessage.includes('✅') ? '#065f46' : '#991b1b',
-              whiteSpace: 'pre-line', // This allows \n to create new lines
+              whiteSpace: 'pre-line',
               fontSize: '14px',
               lineHeight: '1.6'
             }}>
@@ -477,7 +819,9 @@ const NEXAAddInventoryApp = () => {
             </div>
           )}
 
+          {/* NEW HOME LAYOUT - 5 BUTTONS IN ORDER */}
           <div style={{ display: 'grid', gap: '16px' }}>
+            {/* 1. ADD Inventory */}
             <button 
               onClick={simulateBarcodeScan}
               disabled={processing}
@@ -489,31 +833,51 @@ const NEXAAddInventoryApp = () => {
                 cursor: processing ? 'not-allowed' : 'pointer'
               }}
             >
-              📱 {processing ? 'Processing...' : 'Scan Barcode'}
+              📱 {processing ? 'Processing...' : 'ADD Inventory'}
             </button>
 
+            {/* 2. USE Inventory */}
             <button 
               onClick={() => {
-                setNewProduct({...newProduct, itemId: ''});
-                setScreen('newProduct');
+                window.open('https://nexa-inventory-use.vercel.app/', '_blank');
               }}
-              disabled={processing}
               style={{
                 ...buttonStyle, 
-                background: processing ? '#9ca3af' : '#8b5cf6',
-                cursor: processing ? 'not-allowed' : 'pointer'
+                background: '#dc2626',
+                fontSize: '18px'
               }}
             >
-              ➕ Add New Product
+              🧪 USE Inventory
             </button>
 
+            {/* 3. Reports */}
             <button 
-              onClick={() => alert('🚧 Invoice scanning coming soon!')}
-              style={{...buttonStyle, background: '#10b981'}}
+              onClick={() => alert('🚧 Reports functionality coming soon!\n\nWill include:\n• Low stock alerts\n• Purchase history\n• Usage analytics\n• Vendor reports')}
+              style={{
+                ...buttonStyle, 
+                background: '#7c3aed',
+                fontSize: '18px'
+              }}
             >
-              📄 Scan Invoice
+              📊 Reports
             </button>
 
+            {/* 4. Settings */}
+            <button 
+              onClick={() => {
+                setTempSettings({...settings});
+                setScreen('settings');
+              }}
+              style={{
+                ...buttonStyle, 
+                background: '#059669',
+                fontSize: '18px'
+              }}
+            >
+              ⚙️ Settings
+            </button>
+
+            {/* 5. Refresh Inventory */}
             <button 
               onClick={fetchInventory}
               disabled={processing}
@@ -526,6 +890,28 @@ const NEXAAddInventoryApp = () => {
               }}
             >
               🔄 {processing ? 'Loading...' : 'Refresh Inventory'}
+            </button>
+          </div>
+
+          {/* Quick Add Button */}
+          <div style={{ marginTop: '24px', textAlign: 'center' }}>
+            <button 
+              onClick={() => {
+                setNewProduct({...newProduct, itemId: ''});
+                setScreen('newProduct');
+              }}
+              disabled={processing}
+              style={{
+                ...buttonStyle, 
+                background: processing ? '#9ca3af' : '#f59e0b',
+                fontSize: '16px',
+                padding: '12px',
+                cursor: processing ? 'not-allowed' : 'pointer',
+                maxWidth: '300px',
+                margin: '0 auto'
+              }}
+            >
+              ➕ Add New Product
             </button>
           </div>
 
@@ -560,7 +946,7 @@ const NEXAAddInventoryApp = () => {
             color: '#0c4a6e'
           }}>
             <div style={{ fontWeight: '600', marginBottom: '4px' }}>📊 Automatic Purchase Tracking</div>
-            <div>All inventory additions are logged to "Purchases {new Date().getFullYear()}" tab at the end of your spreadsheet for accounting purposes.</div>
+            <div>All inventory additions are logged to "Purchases {new Date().getFullYear()}" tab for accounting purposes.</div>
           </div>
         </div>
       </div>
