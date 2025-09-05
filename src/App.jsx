@@ -36,7 +36,7 @@ const NEXAAddInventoryApp = () => {
     SHEET_ID: '1U1SmQThzUECR_0uFDmTIa4M_lyKgKyTqnhbsQl-zhK8',
     API_KEY: 'AIzaSyBH70BfRf8m3qs2K4WqnUKzLD8E1YY6blo',
     RANGE: 'A:K',
-    SCRIPT_URL: 'https://script.google.com/macros/s/AKfycbx_3RQVPfXsKKiMY0t-3Zgg6WfwLsRDi-apQtLBsqInlpRbhj2MqEJaieQKf53Ma9_DGQ/exec'
+    SCRIPT_URL: 'https://script.google.com/macros/s/AKfycbxWXCB5nQG22wVKs5Jjt2LzXAMAnkN-fZ8PUEqUlgBnXbvQPfye2bTxep8jUHfgWErC1Q/exec'
   };
 
   const [inventory, setInventory] = useState([]);
