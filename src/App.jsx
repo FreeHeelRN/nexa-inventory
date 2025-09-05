@@ -1,5 +1,5 @@
-// NEXA ADD Inventory - Working Version with Barcode Scanning
-// Features: Barcode scan, Product search, Add new products, Google Sheets integration
+// NEXA ADD Inventory - Complete System with Automatic Purchase Logging
+// Features: Barcode scan, Product search, Add new products, Google Sheets integration, Purchase tracking
 import React, { useState, useEffect } from 'react';
 
 const NEXAAddInventoryApp = () => {
@@ -31,11 +31,12 @@ const NEXAAddInventoryApp = () => {
     vendorContact: ''
   });
 
+  // Updated Google Sheets Configuration with new Apps Script URL
   const GOOGLE_SHEETS_CONFIG = {
     SHEET_ID: '1U1SmQThzUECR_0uFDmTIa4M_lyKgKyTqnhbsQl-zhK8',
     API_KEY: 'AIzaSyBH70BfRf8m3qs2K4WqnUKzLD8E1YY6blo',
     RANGE: 'A:K',
-    SCRIPT_URL: 'https://script.google.com/macros/s/AKfycbxMzB3Xcv0NAMrBBSfSaNtBFdUOce2logB3BpnjFoD4-VRdBtKM735o64YvTkML3Ui9dw/exec'
+    SCRIPT_URL: 'https://script.google.com/macros/s/AKfycbx_3RQVPfXsKKiMY0t-3Zgg6WfwLsRDi-apQtLBsqInlpRbhj2MqEJaieQKf53Ma9_DGQ/exec'
   };
 
   const [inventory, setInventory] = useState([]);
@@ -107,7 +108,7 @@ const NEXAAddInventoryApp = () => {
     }
   };
 
-  // Add stock to existing product
+  // Add stock to existing product with enhanced success messages
   const addStockToProduct = async (product, quantity) => {
     setProcessing(true);
     setStatusMessage(`Adding ${quantity} to ${product.name}...`);
@@ -124,13 +125,21 @@ const NEXAAddInventoryApp = () => {
       const responseText = await response.text();
 
       if (responseText.includes('SUCCESS')) {
-        setStatusMessage(`✅ Added ${quantity} to ${product.name}`);
+        // Enhanced success message showing purchase logging
+        const currentYear = new Date().getFullYear();
+        let successMsg = `✅ Added ${quantity} to ${product.brand} ${product.name}`;
         
-        // Refresh inventory
+        if (responseText.includes('Purchase logged')) {
+          successMsg += `\n📊 Purchase logged to Purchases ${currentYear}`;
+        }
+        
+        setStatusMessage(successMsg);
+        
+        // Refresh inventory to show updated stock
         setTimeout(() => {
           fetchInventory();
           setStatusMessage('');
-        }, 2000);
+        }, 3000);
         
         return true;
       } else {
@@ -210,13 +219,20 @@ const NEXAAddInventoryApp = () => {
       const responseText = await response.text();
 
       if (responseText.includes('SUCCESS')) {
-        setStatusMessage(`✅ Updated ${productData.name}`);
+        // Enhanced success message for barcode update with purchase logging
+        const currentYear = new Date().getFullYear();
+        let successMsg = `✅ Updated ${productData.brand} ${productData.name}`;
+        successMsg += `\n🔄 Barcode changed to: ${productData.itemId}`;
+        successMsg += `\n📦 Added ${productData.quantity} to stock`;
         
-        // Also add the quantity to inventory
-        setTimeout(async () => {
-          await addStockToProduct({...productData, itemId: productData.itemId}, productData.quantity);
-          
-          // Reset states and go home
+        if (responseText.includes('Purchase logged')) {
+          successMsg += `\n📊 Purchase logged to Purchases ${currentYear}`;
+        }
+        
+        setStatusMessage(successMsg);
+        
+        // Reset states and go home after showing message
+        setTimeout(() => {
           setScreen('home');
           setScannedBarcode('');
           setSearchTerm('');
@@ -225,7 +241,9 @@ const NEXAAddInventoryApp = () => {
           setSelectedProduct(null);
           setNewItemId('');
           setOriginalItemId('');
-        }, 1000);
+          setStatusMessage('');
+          fetchInventory(); // Refresh inventory
+        }, 4000);
         
         return true;
       } else {
@@ -241,7 +259,7 @@ const NEXAAddInventoryApp = () => {
     }
   };
 
-  // Add completely new product
+  // Add completely new product with purchase logging
   const addNewProductToInventory = async (productData) => {
     setProcessing(true);
     setStatusMessage('Adding new product to inventory...');
@@ -258,7 +276,16 @@ const NEXAAddInventoryApp = () => {
       const responseText = await response.text();
 
       if (responseText.includes('SUCCESS')) {
-        setStatusMessage(`✅ Successfully added: ${productData.brand} ${productData.name}`);
+        // Enhanced success message for new product with purchase logging
+        const currentYear = new Date().getFullYear();
+        let successMsg = `✅ Successfully added: ${productData.brand} ${productData.name}`;
+        successMsg += `\n📦 Initial stock: ${productData.quantity} units`;
+        
+        if (responseText.includes('Purchase logged')) {
+          successMsg += `\n📊 Purchase logged to Purchases ${currentYear}`;
+        }
+        
+        setStatusMessage(successMsg);
         
         // Reset form and go home
         setTimeout(() => {
@@ -276,8 +303,9 @@ const NEXAAddInventoryApp = () => {
             vendor: '',
             vendorContact: ''
           });
+          setStatusMessage('');
           fetchInventory();
-        }, 2000);
+        }, 4000);
         
         return true;
       } else {
@@ -426,7 +454,7 @@ const NEXAAddInventoryApp = () => {
             </h1>
             <p style={{ color: '#6b7280', fontSize: '18px' }}>Add Inventory System</p>
             <p style={{ fontSize: '14px', color: '#059669', marginTop: '8px' }}>
-              📊 {inventory.length} products in database
+              📊 {inventory.length} products • 📈 Purchase tracking enabled
             </p>
           </div>
 
@@ -438,7 +466,10 @@ const NEXAAddInventoryApp = () => {
               borderRadius: '8px', 
               marginBottom: '24px', 
               textAlign: 'center',
-              color: statusMessage.includes('✅') ? '#065f46' : '#991b1b'
+              color: statusMessage.includes('✅') ? '#065f46' : '#991b1b',
+              whiteSpace: 'pre-line', // This allows \n to create new lines
+              fontSize: '14px',
+              lineHeight: '1.5'
             }}>
               {statusMessage}
             </div>
@@ -495,6 +526,20 @@ const NEXAAddInventoryApp = () => {
                 </div>
               </div>
             ))}
+          </div>
+
+          {/* Purchase Tracking Notice */}
+          <div style={{ 
+            marginTop: '30px', 
+            padding: '12px', 
+            background: '#f0f9ff', 
+            border: '1px solid #0ea5e9',
+            borderRadius: '8px',
+            fontSize: '12px',
+            color: '#0c4a6e'
+          }}>
+            <div style={{ fontWeight: '600', marginBottom: '4px' }}>📊 Automatic Purchase Tracking</div>
+            <div>All inventory additions are automatically logged to "Purchases {new Date().getFullYear()}" for accounting purposes.</div>
           </div>
         </div>
       </div>
@@ -621,7 +666,7 @@ const NEXAAddInventoryApp = () => {
     );
   }
 
-  // EDIT PRODUCT SCREEN (WITH NEW QUICK UPDATE BUTTON)
+  // EDIT PRODUCT SCREEN (WITH QUICK UPDATE BUTTON)
   if (screen === 'editProduct') {
     return (
       <div style={containerStyle}>
@@ -652,7 +697,10 @@ const NEXAAddInventoryApp = () => {
               borderRadius: '8px', 
               marginBottom: '24px', 
               textAlign: 'center',
-              color: statusMessage.includes('✅') ? '#065f46' : '#991b1b'
+              color: statusMessage.includes('✅') ? '#065f46' : '#991b1b',
+              whiteSpace: 'pre-line',
+              fontSize: '14px',
+              lineHeight: '1.5'
             }}>
               {statusMessage}
             </div>
@@ -669,7 +717,7 @@ const NEXAAddInventoryApp = () => {
             </p>
           </div>
 
-          {/* QUICK UPDATE BUTTON - NEW FEATURE */}
+          {/* QUICK UPDATE BUTTON - Enhanced with purchase logging info */}
           <div style={{ marginBottom: '24px' }}>
             <button 
               onClick={quickUpdateBarcode}
@@ -678,15 +726,15 @@ const NEXAAddInventoryApp = () => {
                 ...buttonStyle,
                 background: processing ? '#9ca3af' : '#10b981',
                 cursor: processing ? 'not-allowed' : 'pointer',
-                fontSize: '20px',
+                fontSize: '18px',
                 padding: '20px',
                 border: '3px solid #065f46'
               }}
             >
               {processing ? '⏳ Updating...' : `✅ Update Barcode to ${scannedBarcode} & Add 1 to Stock`}
             </button>
-            <p style={{ textAlign: 'center', fontSize: '14px', color: '#6b7280', marginTop: '8px' }}>
-              Quick option: Updates barcode and adds 1 to inventory immediately
+            <p style={{ textAlign: 'center', fontSize: '13px', color: '#6b7280', marginTop: '8px' }}>
+              Quick option: Updates barcode, adds 1 to inventory, and logs purchase automatically
             </p>
           </div>
 
@@ -870,7 +918,10 @@ const NEXAAddInventoryApp = () => {
               borderRadius: '8px', 
               marginBottom: '24px', 
               textAlign: 'center',
-              color: statusMessage.includes('✅') ? '#065f46' : '#991b1b'
+              color: statusMessage.includes('✅') ? '#065f46' : '#991b1b',
+              whiteSpace: 'pre-line',
+              fontSize: '14px',
+              lineHeight: '1.5'
             }}>
               {statusMessage}
             </div>
@@ -1021,6 +1072,19 @@ const NEXAAddInventoryApp = () => {
               </button>
             </div>
           </form>
+
+          {/* Purchase Tracking Notice */}
+          <div style={{ 
+            marginTop: '16px', 
+            padding: '12px', 
+            background: '#f0f9ff', 
+            border: '1px solid #0ea5e9',
+            borderRadius: '6px',
+            fontSize: '12px',
+            color: '#0c4a6e'
+          }}>
+            💡 This purchase will be automatically logged to "Purchases {new Date().getFullYear()}" for tax/accounting purposes.
+          </div>
         </div>
       </div>
     );
