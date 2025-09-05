@@ -1,5 +1,6 @@
-// NEXA ADD Inventory - Working Version with Barcode Scanning
-// Features: Barcode scan, Product search, Add new products, Google Sheets integration
+// NEXA REPORTS, preliminary
+// Features: daily reports on formula notes, weekly reports on products that are below stock minimum, 
+//date range reports on all products added to inventory
 import React, { useState, useEffect } from 'react';
 
 const NEXAAddInventoryApp = () => {
